@@ -2,15 +2,15 @@
   "schema_version": "1.0",
   "project": "絶対伝えろよリマインダー",
   "source_document": "docs/process.md（PM補完版）",
-  "last_updated": "2026-09-27T18:35:00+09:00",
+  "last_updated": "2026-09-27T19:02:00+09:00",
   "session_count": 2,
   "notion_pages": {
     "technical_design": null,
     "process_document": null
   },
-  "current_phase": "Phase 2",
-  "current_task": "TASK-P2-002",
-  "summary": "Phase 1 を main にマージ（テスト130件）。本番 D1(enam)/KV 作成・マイグレーション・デプロイ済み、未認証401確認済み。GITHUB_CLIENT_SECRET の設定（本人）待ち。",
+  "current_phase": "Phase 3",
+  "current_task": "SPIKE-003",
+  "summary": "Phase 2 完了。claude.ai にコネクタ接続（ツール5本・常に許可）、個人設定に指示文追記、E2Eで先頭表示・取得時アーカイブ・0件時無表示を確認。空ボード27ms/非空42ms。Phase 3 は1〜2週間の遵守率観察。",
   "phases": {
     "Phase 1": {
       "status": "complete",
@@ -43,7 +43,7 @@
       }
     },
     "Phase 2": {
-      "status": "in_progress",
+      "status": "complete",
       "tasks": {
         "TASK-P2-001": {
           "status": "complete",
@@ -52,9 +52,9 @@
           }
         },
         "TASK-P2-002": {
-          "status": "in_progress",
+          "status": "complete",
           "verification": {
-            "notes": "GitHub OAuth App 作成済み・GITHUB_CLIENT_ID/COOKIE_ENCRYPTION_KEY 設定済み。GITHUB_CLIENT_SECRET は本人入力待ち"
+            "notes": "GitHub OAuth App 作成、secret 3本を secret list で確認"
           }
         },
         "TASK-P2-003": {
@@ -64,16 +64,32 @@
           }
         },
         "TASK-P2-004": {
-          "status": "not_started"
+          "status": "complete",
+          "verification": {
+            "notes": "コネクタ追加・GitHub認可・ツール5本を常に許可。個人設定に指示文追記（再読込で763字・11行を確認）"
+          }
         },
         "TASK-P2-005": {
-          "status": "not_started"
+          "status": "complete",
+          "verification": {
+            "notes": "E2E: 非空 returned=1 duration 42ms・1行目に line 表示・archived_at 付与 / 空 returned=0 duration 27ms・リマインダー記述なし。duration はツールハンドラ内計測（認証・DO経由の時間は含まない）。サンプル2件のみ"
+          }
         }
       }
     },
     "Phase 3": {
-      "status": "not_started",
-      "tasks": {}
+      "status": "in_progress",
+      "tasks": {
+        "SPIKE-002": {
+          "status": "not_started"
+        },
+        "SPIKE-003": {
+          "status": "in_progress",
+          "verification": {
+            "notes": "2026-09-27 開始。1〜2週間、遵守率95%以上を観察"
+          }
+        }
+      }
     }
   },
   "blockers": [],
@@ -121,8 +137,8 @@
       "session": 1,
       "date": "2026-09-27",
       "started_at": "TASK-P1-001",
-      "ended_at": "TASK-P2-002",
-      "summary": "プラン生成→ralphex実行（5hリミットで1回中断・再開）→独立検証→mainマージ→本番デプロイ"
+      "ended_at": "TASK-P2-005",
+      "summary": "プラン生成→ralphex実行（5hリミットで1回中断・再開）→独立検証→mainマージ→本番デプロイ→claude.ai接続・指示文追記・E2E確認"
     }
   ]
 }
