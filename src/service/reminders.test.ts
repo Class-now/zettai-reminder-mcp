@@ -360,6 +360,29 @@ describe("addReminder", () => {
 		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 	});
 
+	it("上限は文字数で数える（サロゲートペアの絵文字を 2 文字と数えない）", async () => {
+		// UTF-16 のコード単位で数えると 400 で弾かれてしまう 200 文字。
+		const ok = await service.addReminder({ body: "\u{1f44d}".repeat(200), kind: "explicit" });
+		expect([...ok.reminder.body].length).toBe(200);
+
+		const over = await service
+			.addReminder({ body: "\u{1f44d}".repeat(201), kind: "explicit" })
+			.catch((cause: unknown) => cause);
+		expect(over).toMatchObject({ code: "VALIDATION_ERROR" });
+		expect((over as ServiceError).message).toContain("201 文字");
+
+		const noteOk = await service.addReminder({
+			body: "絵文字のメモ",
+			kind: "auto",
+			note: "\u{1f44d}".repeat(1000),
+		});
+		expect([...(noteOk.reminder.note ?? "")].length).toBe(1000);
+
+		await expect(
+			service.addReminder({ body: "絵文字のメモ", kind: "auto", note: "\u{1f44d}".repeat(1001) }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+	});
+
 	it("note は空白だけなら null になり、1000 文字を超えると VALIDATION_ERROR", async () => {
 		const blank = await service.addReminder({ body: "メモなし", kind: "auto", note: "   " });
 		expect(blank.reminder.note).toBeNull();

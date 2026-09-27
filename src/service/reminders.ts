@@ -202,6 +202,15 @@ function compareBoardItems(a: BoardItem, b: BoardItem): number {
 }
 
 /**
+ * 上限は「文字数」で数える。`String.prototype.length` は UTF-16 のコード単位なので
+ * 絵文字などサロゲートペアの文字を 2 と数えてしまい、実効上限が半分になり、
+ * エラーメッセージの件数も実際と合わなくなる（SQLite の `length()` も文字数で数える）。
+ */
+function charLength(text: string): number {
+	return [...text].length;
+}
+
+/**
  * 本文は表示用の 1 行（`line`）と確認文（`confirmation`）にそのまま埋め込まれるので、
  * 改行を含む連続した空白は半角スペース 1 個に畳んで必ず 1 行にする。
  * 単独の全角スペース（U+3000）は「連続する空白」ではないので書き換えない
@@ -215,10 +224,11 @@ function requireBody(body: string): string {
 	if (collapsed.length === 0) {
 		throw new ServiceError("VALIDATION_ERROR", "body は 1 文字以上にしてください");
 	}
-	if (collapsed.length > MAX_BODY_LENGTH) {
+	const bodyLength = charLength(collapsed);
+	if (bodyLength > MAX_BODY_LENGTH) {
 		throw new ServiceError(
 			"VALIDATION_ERROR",
-			`body は ${MAX_BODY_LENGTH} 文字以内にしてください（${collapsed.length} 文字）`,
+			`body は ${MAX_BODY_LENGTH} 文字以内にしてください（${bodyLength} 文字）`,
 		);
 	}
 	return collapsed;
@@ -230,10 +240,11 @@ function normalizeNote(note: string | null | undefined): string | null {
 		return null;
 	}
 	const trimmed = note.trim();
-	if (trimmed.length > MAX_NOTE_LENGTH) {
+	const noteLength = charLength(trimmed);
+	if (noteLength > MAX_NOTE_LENGTH) {
 		throw new ServiceError(
 			"VALIDATION_ERROR",
-			`note は ${MAX_NOTE_LENGTH} 文字以内にしてください（${trimmed.length} 文字）`,
+			`note は ${MAX_NOTE_LENGTH} 文字以内にしてください（${noteLength} 文字）`,
 		);
 	}
 	return trimmed.length === 0 ? null : trimmed;
