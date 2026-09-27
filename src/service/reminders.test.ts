@@ -343,6 +343,14 @@ describe("addReminder", () => {
 		expect(board.items[0].line).not.toContain("\n");
 	});
 
+	it("単独の全角スペースは残し、連続する空白だけを半角 1 個に畳む", async () => {
+		const kept = await service.addReminder({ body: "山田\u3000太郎に連絡", kind: "explicit" });
+		expect(kept.reminder.body).toBe("山田\u3000太郎に連絡");
+
+		const folded = await service.addReminder({ body: "山田\u3000\u3000太郎に連絡", kind: "explicit" });
+		expect(folded.reminder.body).toBe("山田 太郎に連絡");
+	});
+
 	it("body は 200 文字まで、201 文字は VALIDATION_ERROR", async () => {
 		const ok = await service.addReminder({ body: "あ".repeat(200), kind: "explicit" });
 		expect(ok.reminder.body.length).toBe(200);
@@ -516,6 +524,20 @@ describe("updateReminder", () => {
 
 		const collapsed = await service.updateReminder({ id: added.reminder.id, body: " 新\nしい " });
 		expect(collapsed.reminder.body).toBe("新 しい");
+
+		// show_at は消せない列なので null は「指定なし」。他の項目だけが変わる
+		const withNullShowAt = await service.updateReminder({
+			id: added.reminder.id,
+			show_at: null,
+			note: "残す",
+		});
+		expect(withNullShowAt.reminder.show_at).toBe(added.reminder.show_at);
+		expect(withNullShowAt.reminder.note).toBe("残す");
+
+		// null だけなら指定が無いのと同じで VALIDATION_ERROR
+		await expect(
+			service.updateReminder({ id: added.reminder.id, show_at: null }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
 		await expect(
 			service.updateReminder({ id: added.reminder.id, body: "あ".repeat(201) }),

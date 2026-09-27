@@ -171,6 +171,14 @@ describe("入力スキーマ（zod）", () => {
 		).toBe(true);
 	});
 
+	it("update_reminder は show_at の null を指定なしと同じに受ける", () => {
+		// show_at は消せない列だが、due_at / note と同じ形で null が来ても
+		// zod で落として封筒外のエラーにしない
+		const schema = schemaOf("update_reminder");
+
+		expect(schema.safeParse({ id: "r1", show_at: null, note: "メモ" }).success).toBe(true);
+	});
+
 	it("list_reminders は status を 3 値に限り、limit を 1〜100 の整数に限る", () => {
 		const schema = schemaOf("list_reminders");
 

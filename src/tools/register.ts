@@ -101,7 +101,7 @@ const listShape = {
 const updateShape = {
 	id: z.string().describe("対象のリマインダー id"),
 	body: z.string().optional().describe("新しい本文（1〜200 文字）"),
-	show_at: z.string().optional().describe(`新しい表示時刻（${JST_HINT}）`),
+	show_at: z.string().nullish().describe(`新しい表示時刻（${JST_HINT}）。null は指定なしと同じ`),
 	due_at: z.string().nullable().optional().describe(`新しい期限。null で期限を消す`),
 	note: z.string().nullable().optional().describe("新しい会話メモ（1000 文字以内）。null で消す"),
 };

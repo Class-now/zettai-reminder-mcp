@@ -231,14 +231,14 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
      - 期限なし: `・[本文]`
      - 会話メモ（note）は返さない
    - D1 が失敗したら `recordCheck` を `ok=0, error_code="DB_ERROR", returned_count=0` で試み（これも失敗したら握りつぶす）、`DB_ERROR` を返す
-2. `add_reminder` — 入力: `body`（1〜200 文字、必須。連続する空白と改行は半角スペース 1 個に畳んで必ず 1 行にする。`line` と `confirmation` にそのまま埋め込むため）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意、1000 文字以内）。`show_at` / `due_at` / `note` は `null` も省略と同じに扱う（`update_reminder` が `null` を消去の意味で受けるため、同じ値で弾かない）
+2. `add_reminder` — 入力: `body`（1〜200 文字、必須。連続する空白と改行は半角スペース 1 個に畳んで必ず 1 行にする。単独の全角スペースは畳まずそのまま残す。`line` と `confirmation` にそのまま埋め込むため）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意、1000 文字以内）。`show_at` / `due_at` / `note` は `null` も省略と同じに扱う（`update_reminder` が `null` を消去の意味で受けるため、同じ値で弾かない）
    - `show_at` が省略または過去なら登録時刻にする（リポジトリが行う）
    - 返り値: `{ reminder: { id, body, show_at, due_at, note, kind, created_at }, confirmation }`。`confirmation` は `登録しました：[本文]（表示 M/D HH:MM）`、期限があれば `登録しました：[本文]（表示 M/D HH:MM、期限 M/D）`
 3. `list_reminders` — 入力: `status`（`"waiting" | "active" | "archived"`、必須）、`limit`（任意、3 ステータスすべてで有効、1〜100。既定は archived が 20、waiting / active が 100）
    - waiting = 表示時刻前の一覧、active = アーカイブされていない行（重複確認用）、archived = 見返し（`archived_at` 付き、新しい順）
    - どのステータスも `LIMIT` を持たせる（「一覧は必ず `LIMIT`」の恒久ルール）。`limit + 1` 件取って切り捨てることで、打ち切りがあったときだけ `has_more: true` を付ける（重複確認の一覧が黙って欠けると重複登録に気づけない）
    - 返り値: `{ status, count, items: [{ id, body, show_at, due_at, note, kind, created_at, archived_at }] }`。どの行の状態も変えない
-4. `update_reminder` — 入力: `id`（必須）と、`body`（1〜200 文字、`add_reminder` と同じ正規化）/ `show_at` / `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上
+4. `update_reminder` — 入力: `id`（必須）と、`body`（1〜200 文字、`add_reminder` と同じ正規化）/ `show_at`（`null` は指定なしと同じ。消せない列なので消去の意味は持たない）/ `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上
    - アーカイブ済み・削除済み・存在しない id は `NOT_FOUND`。更新項目が 1 つも無ければ `VALIDATION_ERROR`
    - 返り値: `{ reminder: {...}, confirmation: "更新しました：[本文]（表示 M/D HH:MM[、期限 M/D]）" }`
 5. `delete_reminder` — 入力: `id`（必須）。アクティブな行だけを論理削除。無ければ `NOT_FOUND`。返り値 `{ deleted: id }`

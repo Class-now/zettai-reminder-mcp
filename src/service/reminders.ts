@@ -59,7 +59,7 @@ export interface ListRemindersInput {
 export interface UpdateReminderInput {
 	id: string;
 	body?: string;
-	show_at?: string;
+	show_at?: string | null;
 	due_at?: string | null;
 	note?: string | null;
 }
@@ -204,9 +204,14 @@ function compareBoardItems(a: BoardItem, b: BoardItem): number {
 /**
  * 本文は表示用の 1 行（`line`）と確認文（`confirmation`）にそのまま埋め込まれるので、
  * 改行を含む連続した空白は半角スペース 1 個に畳んで必ず 1 行にする。
+ * 単独の全角スペース（U+3000）は「連続する空白」ではないので書き換えない
+ * （日本語の本文をそのまま保存する）。
  */
 function requireBody(body: string): string {
-	const collapsed = body.replace(/\s+/g, " ").trim();
+	const collapsed = body
+		.replace(/\s{2,}/g, " ")
+		.replace(/[^\S\u3000]/g, " ")
+		.trim();
 	if (collapsed.length === 0) {
 		throw new ServiceError("VALIDATION_ERROR", "body は 1 文字以上にしてください");
 	}
@@ -360,7 +365,9 @@ export class ReminderService {
 		if (input.body !== undefined) {
 			patch.body = requireBody(input.body);
 		}
-		if (input.show_at !== undefined) {
+		// show_at は消せない列なので、`null` は `add_reminder` と同じく「指定なし」として扱う
+		// （`due_at` / `note` の消去に使う `null` をそのまま渡されても封筒外で落ちないようにする）。
+		if (input.show_at != null) {
 			patch.showAt = parseJstDateTime(input.show_at);
 		}
 		if (input.due_at !== undefined) {
