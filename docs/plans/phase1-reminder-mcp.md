@@ -122,12 +122,12 @@ Do NOT implement: リマインダーのツール・D1 のスキーマ（Task 2�
 
 **Requirements**: REQ-F007（表示時刻・期限・登録日時はすべて日本時間として解釈・保存・比較する。「10/3 8:00」で登録したものは日本時間 10/3 7:59 の参照ではボードに含まれず、8:00 以降の参照で含まれる）、REQ-F023（残り日数）。
 
-- [ ] 上記 7 つの export が `src/lib/datetime.ts` にある
-- [ ] `nowJst` のテストが `process.env.TZ` を `America/New_York` と `UTC` に変えても同じ結果になる（`nowMs` 固定で検証）
-- [ ] `parseJstDateTime` がオフセット無し・`Z`・`+00:00`・`2026-02-30T10:00+09:00`・`2026-10-03T25:00+09:00` を `INVALID_DATETIME` で拒否するテストがある
-- [ ] `parseJstDue("2026-10-05")` が `2026-10-05T23:59:00+09:00` を返すテストがある
-- [ ] `daysUntil` の当日 0・翌々日 2・前日 −1 と、日付境界（23:59 と 00:00）のテストがある
-- [ ] `npm run typecheck` と `npm test` が通る
+- [x] 上記 7 つの export が `src/lib/datetime.ts` にある
+- [x] `nowJst` のテストが `process.env.TZ` を `America/New_York` と `UTC` に変えても同じ結果になる（`nowMs` 固定で検証）
+- [x] `parseJstDateTime` がオフセット無し・`Z`・`+00:00`・`2026-02-30T10:00+09:00`・`2026-10-03T25:00+09:00` を `INVALID_DATETIME` で拒否するテストがある
+- [x] `parseJstDue("2026-10-05")` が `2026-10-05T23:59:00+09:00` を返すテストがある
+- [x] `daysUntil` の当日 0・翌々日 2・前日 −1 と、日付境界（23:59 と 00:00）のテストがある
+- [x] `npm run typecheck` と `npm test` が通る
 
 Do NOT implement: 自然言語の時刻解釈（「明日の朝」などは Claude 側が具体的な日時に直してから渡す）、他のタイムゾーンへの対応、date-fns 等の依存追加。
 
