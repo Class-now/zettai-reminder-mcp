@@ -160,6 +160,17 @@ describe("入力スキーマ（zod）", () => {
 		expect(schema.safeParse({ body: 1, kind: "auto" }).success).toBe(false);
 	});
 
+	it("add_reminder は show_at / due_at / note の null を省略と同じに受ける", () => {
+		// update_reminder が null を消去の意味で受けるので、同じ値が add に来ても弾かない
+		// （zod で落ちると共通の error 封筒に載らず、登録も黙って失敗する）
+		const schema = schemaOf("add_reminder");
+
+		expect(
+			schema.safeParse({ body: "本文", kind: "auto", show_at: null, due_at: null, note: null })
+				.success,
+		).toBe(true);
+	});
+
 	it("list_reminders は status を 3 値に限り、limit を 1〜100 の整数に限る", () => {
 		const schema = schemaOf("list_reminders");
 

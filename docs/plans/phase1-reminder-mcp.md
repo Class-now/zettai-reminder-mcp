@@ -184,7 +184,7 @@ CREATE TABLE board_checks (
 | `listActive(limit)` | アクティブを `ORDER BY show_at, id LIMIT ?`（重複確認用）。一覧は必ず `LIMIT` を持たせる |
 | `listArchived(limit)` | アーカイブ済みを `ORDER BY archived_at DESC, show_at DESC, id LIMIT ?` |
 | `update(id, patch, now)` | `UPDATE reminders SET <patch の列>, updated_at = ? WHERE id = ? AND archived_at IS NULL AND deleted_at IS NULL RETURNING *`。patch は body / show_at / due_at（null で消去可）/ note（null で消去可）。`show_at` が `now` より前なら `now` に置き換える。0 行なら `null` を返す |
-| `softDelete(id, now)` | `UPDATE reminders SET deleted_at = ? WHERE id = ? AND archived_at IS NULL AND deleted_at IS NULL RETURNING id`。0 行なら `false` |
+| `softDelete(id, now)` | `UPDATE reminders SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND archived_at IS NULL AND deleted_at IS NULL RETURNING id`。0 行なら `false` |
 
 - 行は snake_case のまま返さず、`Reminder` 型（camelCase: `id, body, showAt, dueAt, note, kind, createdAt, updatedAt, archivedAt`）に変換する
 - `takeBoard` の結果の並べ替えはリポジトリでは行わない（Task 4 のサービス層で行う）
@@ -231,7 +231,7 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
      - 期限なし: `・[本文]`
      - 会話メモ（note）は返さない
    - D1 が失敗したら `recordCheck` を `ok=0, error_code="DB_ERROR", returned_count=0` で試み（これも失敗したら握りつぶす）、`DB_ERROR` を返す
-2. `add_reminder` — 入力: `body`（1〜200 文字、必須。連続する空白と改行は半角スペース 1 個に畳んで必ず 1 行にする。`line` と `confirmation` にそのまま埋め込むため）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意、1000 文字以内）
+2. `add_reminder` — 入力: `body`（1〜200 文字、必須。連続する空白と改行は半角スペース 1 個に畳んで必ず 1 行にする。`line` と `confirmation` にそのまま埋め込むため）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意、1000 文字以内）。`show_at` / `due_at` / `note` は `null` も省略と同じに扱う（`update_reminder` が `null` を消去の意味で受けるため、同じ値で弾かない）
    - `show_at` が省略または過去なら登録時刻にする（リポジトリが行う）
    - 返り値: `{ reminder: { id, body, show_at, due_at, note, kind, created_at }, confirmation }`。`confirmation` は `登録しました：[本文]（表示 M/D HH:MM）`、期限があれば `登録しました：[本文]（表示 M/D HH:MM、期限 M/D）`
 3. `list_reminders` — 入力: `status`（`"waiting" | "active" | "archived"`、必須）、`limit`（任意、3 ステータスすべてで有効、1〜100。既定は archived が 20、waiting / active が 100）

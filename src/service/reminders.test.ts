@@ -297,6 +297,21 @@ describe("addReminder", () => {
 		expect(past.reminder.show_at).toBe(NOW);
 	});
 
+	it("show_at / due_at / note の null は省略と同じに扱う", async () => {
+		const added = await service.addReminder({
+			body: "null 入り",
+			kind: "auto",
+			show_at: null,
+			due_at: null,
+			note: null,
+		});
+
+		expect(added.reminder.show_at).toBe(NOW);
+		expect(added.reminder.due_at).toBeNull();
+		expect(added.reminder.note).toBeNull();
+		expect(added.confirmation).toBe("登録しました：null 入り（表示 10/3 08:00）");
+	});
+
 	it("kind を保存し、note は応答に含むが check_board には出さない", async () => {
 		const auto = await service.addReminder({ body: "自動登録", kind: "auto", note: "会話から" });
 

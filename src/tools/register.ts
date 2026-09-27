@@ -79,9 +79,12 @@ const JST_HINT = "日本時間の YYYY-MM-DDTHH:MM:SS+09:00 形式";
 const addShape = {
 	body: z.string().describe("リマインダーの本文（1〜200 文字。改行は半角スペースに畳まれる）"),
 	kind: z.enum(["explicit", "auto"]).describe("依頼による登録は explicit、自動登録は auto"),
-	show_at: z.string().optional().describe(`表示時刻（${JST_HINT}）。省略すると即時`),
-	due_at: z.string().optional().describe(`期限（${JST_HINT} または YYYY-MM-DD）`),
-	note: z.string().optional().describe("会話メモ（1000 文字以内）。check_board の応答には含まれない"),
+	show_at: z.string().nullish().describe(`表示時刻（${JST_HINT}）。省略または null で即時`),
+	due_at: z.string().nullish().describe(`期限（${JST_HINT} または YYYY-MM-DD）。省略または null で期限なし`),
+	note: z
+		.string()
+		.nullish()
+		.describe("会話メモ（1000 文字以内）。省略または null でメモなし。check_board の応答には含まれない"),
 };
 
 const listShape = {

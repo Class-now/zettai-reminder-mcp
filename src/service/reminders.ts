@@ -37,13 +37,17 @@ export class ServiceError extends Error {
 
 export type ReminderStatus = "waiting" | "active" | "archived";
 
-/** ツールの入力はそのまま snake_case で受け取る（MCP の入力スキーマと同じ形）。 */
+/**
+ * ツールの入力はそのまま snake_case で受け取る（MCP の入力スキーマと同じ形）。
+ * `show_at` / `due_at` / `note` は `null` も省略（`undefined`）と同じに扱う
+ * （`update_reminder` が `null` を消去の意味で受けるので、同じ値が来ても弾かない）。
+ */
 export interface AddReminderInput {
 	body: string;
 	kind: ReminderKind;
-	show_at?: string;
-	due_at?: string;
-	note?: string;
+	show_at?: string | null;
+	due_at?: string | null;
+	note?: string | null;
 }
 
 export interface ListRemindersInput {
@@ -300,8 +304,8 @@ export class ReminderService {
 		const reminder = await this.repo.insert(
 			{
 				body,
-				showAt: input.show_at === undefined ? undefined : parseJstDateTime(input.show_at),
-				dueAt: input.due_at === undefined ? null : parseJstDue(input.due_at),
+				showAt: input.show_at == null ? undefined : parseJstDateTime(input.show_at),
+				dueAt: input.due_at == null ? null : parseJstDue(input.due_at),
 				note: normalizeNote(input.note),
 				kind: input.kind,
 			},
