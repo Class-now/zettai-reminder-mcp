@@ -109,6 +109,11 @@ export interface DeleteReminderResult {
 	deleted: string;
 }
 
+/**
+ * 1 回の `check_board` で取る上限。Claude の文脈に無制限に流し込まないための
+ * 上限であり、超えた分は残って次の `check_board` で返る（失われない）。
+ */
+const BOARD_TAKE_LIMIT = 50;
 const DEFAULT_ARCHIVED_LIMIT = 20;
 /** waiting / active は「重複確認」用なので既定でも上限まで返す。 */
 const DEFAULT_LIST_LIMIT = 100;
@@ -199,7 +204,8 @@ export class ReminderService {
 
 	/**
 	 * メインボードの取得。`takeBoard` が取得とアーカイブを不可分に行うので、
-	 * 同じリマインダーが 2 回返ることはない。参照記録の失敗は握りつぶす。
+	 * 同じリマインダーが 2 回返ることはない。1 回で返すのは `BOARD_TAKE_LIMIT`
+	 * 件までで、超えた分は次の `check_board` に回る。参照記録の失敗は握りつぶす。
 	 */
 	async checkBoard(): Promise<CheckBoardResult> {
 		const startedMs = this.clock();
@@ -207,7 +213,7 @@ export class ReminderService {
 
 		let taken: BoardItem[];
 		try {
-			taken = await this.repo.takeBoard(now);
+			taken = await this.repo.takeBoard(now, BOARD_TAKE_LIMIT);
 		} catch (cause) {
 			console.error("takeBoard に失敗しました", cause);
 			await this.safeRecord({

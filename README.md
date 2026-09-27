@@ -20,7 +20,7 @@ Claude に計算や整形をさせない。並び順・残り日数・表示用�
 
 | ツール | 入力 | 返り値 |
 | --- | --- | --- |
-| `check_board` | なし | `{ count, items: [{ id, body, due_at, days_left, show_at, kind, line }] }`。表示時刻を過ぎた分を返して同時にアーカイブする。期限の近い順（期限なしは後ろ）。0 件のときは正確に `{"count":0,"items":[]}`。会話メモ（`note`）は返さない |
+| `check_board` | なし | `{ count, items: [{ id, body, due_at, days_left, show_at, kind, line }] }`。表示時刻を過ぎた分を 1 回 50 件まで返して同時にアーカイブする（超えた分は表示時刻の古い順に残り、次の呼び出しで返る）。期限の近い順（期限なしは後ろ）。0 件のときは正確に `{"count":0,"items":[]}`。会話メモ（`note`）は返さない |
 | `add_reminder` | `body`（必須）、`kind`（`explicit` / `auto`、必須）、`show_at`（任意、省略または過去の時刻＝即時）、`due_at`（任意、日時または `YYYY-MM-DD`＝その日の 23:59）、`note`（任意） | `{ reminder, confirmation }`。`confirmation` は `登録しました：[本文]（表示 M/D HH:MM[、期限 M/D]）` |
 | `list_reminders` | `status`（`waiting` / `active` / `archived`、必須）、`limit`（1〜100。既定は archived が 20、waiting / active が 100） | `{ status, count, items }`。どの行の状態も変えない |
 | `update_reminder` | `id`（必須）と `body` / `show_at`（過去に動かすと即時になる）/ `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上 | `{ reminder, confirmation }`。`confirmation` は `更新しました：…` で同じ形。取得済み・削除済み・存在しない id は `NOT_FOUND` |

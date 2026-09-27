@@ -30,7 +30,7 @@ export interface InsertReminderInput {
 	kind: ReminderKind;
 }
 
-/** キーがあれば更新、無ければ現状維持。`dueAt` と `note` は `null` で消去。 */
+/** 値があれば更新、`undefined`（キー無しを含む）は現状維持。`dueAt` と `note` は `null` で消去。 */
 export interface UpdateReminderPatch {
 	body?: string;
 	showAt?: string;
@@ -90,16 +90,23 @@ export class ReminderRepo {
 
 	/**
 	 * 表示時刻を過ぎたアクティブなリマインダーを取得し、同じ 1 文でアーカイブする。
-	 * 事前の SELECT は発行しない（二重表示を構造的に防ぐため）。並べ替えはしない。
+	 * 事前の SELECT（別の文）は発行しない（二重表示を構造的に防ぐため）。
+	 *
+	 * 1 回で取るのは `limit` 件まで。表示時刻の古い順に取るので、超えた分は
+	 * アーカイブされずに残り、次の `takeBoard` で続きが返る。上限が無いと D1 の
+	 * 応答上限（1MB）を超えた時点で 1 文が失敗し、1 件もアーカイブされないまま
+	 * 同じ結果を作り続けて恒久的に詰まる。並べ替え（期限順）はしない。
 	 */
-	async takeBoard(now: string): Promise<BoardItem[]> {
+	async takeBoard(now: string, limit: number): Promise<BoardItem[]> {
 		const { results } = await this.db
 			.prepare(
 				`UPDATE reminders SET archived_at = ?1
-				 WHERE archived_at IS NULL AND deleted_at IS NULL AND show_at <= ?1
+				 WHERE id IN (SELECT id FROM reminders
+				              WHERE archived_at IS NULL AND deleted_at IS NULL AND show_at <= ?1
+				              ORDER BY show_at, id LIMIT ?2)
 				 RETURNING id, body, show_at, due_at, kind`,
 			)
-			.bind(now)
+			.bind(now, limit)
 			.all<Pick<ReminderRow, "id" | "body" | "show_at" | "due_at" | "kind">>();
 		return results.map(toBoardItem);
 	}
@@ -199,13 +206,13 @@ export class ReminderRepo {
 			columns.push("show_at = ?");
 			values.push(patch.showAt < now ? now : patch.showAt);
 		}
-		if ("dueAt" in patch) {
+		if (patch.dueAt !== undefined) {
 			columns.push("due_at = ?");
-			values.push(patch.dueAt ?? null);
+			values.push(patch.dueAt);
 		}
-		if ("note" in patch) {
+		if (patch.note !== undefined) {
 			columns.push("note = ?");
-			values.push(patch.note ?? null);
+			values.push(patch.note);
 		}
 
 		columns.push("updated_at = ?");

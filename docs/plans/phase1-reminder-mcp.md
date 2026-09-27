@@ -176,7 +176,7 @@ CREATE TABLE board_checks (
 
 | メソッド | SQL（要旨） |
 |---|---|
-| `takeBoard(now)` | `UPDATE reminders SET archived_at = ?1 WHERE archived_at IS NULL AND deleted_at IS NULL AND show_at <= ?1 RETURNING id, body, show_at, due_at, kind` — これ 1 文だけ。事前 SELECT 禁止 |
+| `takeBoard(now, limit)` | `UPDATE reminders SET archived_at = ?1 WHERE id IN (SELECT id FROM reminders WHERE archived_at IS NULL AND deleted_at IS NULL AND show_at <= ?1 ORDER BY show_at, id LIMIT ?2) RETURNING id, body, show_at, due_at, kind` — これ 1 文だけ。別文としての事前 SELECT は禁止（件数を絞る副問い合わせは同じ 1 文の中）。上限が無いと D1 の応答上限（1MB）超過で 1 文が失敗し続け、1 件もアーカイブできずに恒久的に詰まる |
 | `recordCheck({checkedAt, returnedCount, ok, errorCode, durationMs})` | `INSERT INTO board_checks …`。`takeBoard` と `db.batch()` でまとめない（記録失敗で取得結果を失わないため） |
 | `insert({body, showAt, dueAt, note, kind}, now)` | `showAt` が省略または `now` より前なら `now` を入れる。`created_at = updated_at = now`。挿入した行を返す |
 | `listWaiting(now)` | 待機中を `ORDER BY show_at` |
@@ -195,12 +195,13 @@ CREATE TABLE board_checks (
 
 - [x] `migrations/0001_init.sql` が上記の 2 テーブルと部分インデックスを作る
 - [x] `ReminderRepo` の 8 メソッドがあり、SQL はすべて `src/repo/` 内にある
-- [x] `takeBoard` の実装が SQL 1 文（`UPDATE … RETURNING`）だけで、SELECT を先に発行しないことをコードで確認できる
+- [x] `takeBoard` の実装が SQL 1 文（`UPDATE … RETURNING`）だけで、別文の SELECT を先に発行しないことをコードで確認できる
 - [x] テスト: 表示時刻が `now` ちょうどの行は取得され、`now` の 1 分後の行は取得されない
 - [x] テスト: `takeBoard` を 2 回続けて呼ぶと、2 回目は 0 件になり、1 回目に返った行の `archived_at` が `now` になっている
 - [x] テスト: 削除済み・アーカイブ済みの行は `takeBoard`・`listWaiting`・`listActive` に出ず、`update`・`softDelete` は 0 行（`null` / `false`）になる
 - [x] テスト: `insert` で過去の `showAt` と省略時の `showAt` がどちらも `now` になる
 - [x] テスト: `listArchived` が取得日時の新しい順で、`limit` を守る
+- [x] テスト: `takeBoard` が `limit` を守り、超えた分は表示時刻の古い順に残って次の `takeBoard` で返る
 - [x] `npm run typecheck` と `npm test` が通る
 
 Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処理、利用者列（本人 1 名のみ）、スヌーズや繰り返し。

@@ -60,7 +60,7 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
 }
 
 export const CHECK_BOARD_DESCRIPTION =
-	"新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。表示時刻を過ぎたリマインダーを返し、同時にアーカイブする（同じものは二度返らない）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。";
+	"新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。表示時刻を過ぎたリマインダーを 1 回 50 件まで返し、同時にアーカイブする（同じものは二度返らない。超えた分は残り、次の呼び出しで返る）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。";
 
 const ADD_REMINDER_DESCRIPTION =
 	"リマインダーを登録する。頼まれたときは kind=\"explicit\"、会話から拾って自動登録するときは kind=\"auto\"。show_at を省略すると即時（次の check_board）で表示される。返り値の confirmation を同じ応答に 1 行そのまま書く。";

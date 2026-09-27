@@ -53,7 +53,7 @@ describe("takeBoard", () => {
 		await seed({ id: "due-now", body: "ちょうど", showAt: NOW });
 		await seed({ id: "one-minute-later", body: "1 分後", showAt: "2026-10-03T08:01:00+09:00" });
 
-		const taken = await repo.takeBoard(NOW);
+		const taken = await repo.takeBoard(NOW, 100);
 
 		expect(taken.map((item) => item.id)).toEqual(["due-now"]);
 		expect((await repo.listWaiting(NOW, 100)).map((r) => r.id)).toEqual(["one-minute-later"]);
@@ -69,7 +69,7 @@ describe("takeBoard", () => {
 			kind: "auto",
 		});
 
-		expect(await repo.takeBoard(NOW)).toEqual([
+		expect(await repo.takeBoard(NOW, 100)).toEqual([
 			{
 				id: "r1",
 				body: "歯医者の予約",
@@ -84,10 +84,10 @@ describe("takeBoard", () => {
 		await seed({ id: "a", body: "A", showAt: "2026-10-01T09:00:00+09:00" });
 		await seed({ id: "b", body: "B", showAt: NOW });
 
-		const first = await repo.takeBoard(NOW);
+		const first = await repo.takeBoard(NOW, 100);
 		expect(first.map((item) => item.id).sort()).toEqual(["a", "b"]);
 
-		expect(await repo.takeBoard(NOW)).toEqual([]);
+		expect(await repo.takeBoard(NOW, 100)).toEqual([]);
 
 		const archived = await repo.listArchived(10);
 		expect(archived.map((r) => r.id).sort()).toEqual(["a", "b"]);
@@ -108,19 +108,29 @@ describe("takeBoard", () => {
 		await seed({ id: "a", body: "A", showAt: NOW });
 		executed.length = 0;
 
-		await new ReminderRepo(spy).takeBoard(NOW);
+		await new ReminderRepo(spy).takeBoard(NOW, 100);
 
+		// 「事前 SELECT 禁止」は別文を発行しないこと。件数を絞る副問い合わせは同じ 1 文の中。
 		expect(executed).toHaveLength(1);
 		expect(executed[0].trimStart().startsWith("UPDATE reminders SET archived_at")).toBe(true);
 		expect(executed[0]).toContain("RETURNING");
-		expect(executed[0].toUpperCase()).not.toContain("SELECT");
+	});
+
+	it("limit を超えた分は表示時刻の古い順に残し、次の takeBoard で返す", async () => {
+		await seed({ id: "c", body: "C", showAt: "2026-10-03T07:00:00+09:00" });
+		await seed({ id: "a", body: "A", showAt: "2026-10-01T09:00:00+09:00" });
+		await seed({ id: "b", body: "B", showAt: "2026-10-02T09:00:00+09:00" });
+
+		expect((await repo.takeBoard(NOW, 2)).map((item) => item.id)).toEqual(["a", "b"]);
+		expect((await repo.takeBoard(NOW, 2)).map((item) => item.id)).toEqual(["c"]);
+		expect(await repo.takeBoard(NOW, 2)).toEqual([]);
 	});
 
 	it("削除済み・アーカイブ済みの行は取得しない", async () => {
 		await seed({ id: "deleted", body: "削除済み", showAt: NOW, deletedAt: NOW });
 		await seed({ id: "archived", body: "取得済み", showAt: NOW, archivedAt: NOW });
 
-		expect(await repo.takeBoard(NOW)).toEqual([]);
+		expect(await repo.takeBoard(NOW, 100)).toEqual([]);
 	});
 });
 
@@ -187,6 +197,23 @@ describe("update / softDelete", () => {
 		expect(cleared?.note).toBeNull();
 	});
 
+	it("値が undefined のキーは現状維持（消去しない）", async () => {
+		const created = await repo.insert(
+			{ body: "元の本文", dueAt: "2026-10-05T23:59:00+09:00", note: "メモ", kind: "explicit" },
+			NOW,
+		);
+		const later = "2026-10-03T09:00:00+09:00";
+
+		const kept = await repo.update(
+			created.id,
+			{ body: "新しい本文", dueAt: undefined, note: undefined },
+			later,
+		);
+
+		expect(kept?.dueAt).toBe("2026-10-05T23:59:00+09:00");
+		expect(kept?.note).toBe("メモ");
+	});
+
 	it("表示時刻を now より前に動かそうとすると now になる", async () => {
 		const created = await repo.insert({ body: "本文", kind: "explicit" }, NOW);
 		const later = "2026-10-03T09:00:00+09:00";
@@ -209,7 +236,7 @@ describe("update / softDelete", () => {
 			.first<{ updated_at: string; deleted_at: string }>();
 		expect(row).toEqual({ updated_at: later, deleted_at: later });
 		expect(await repo.softDelete(created.id, NOW)).toBe(false);
-		expect(await repo.takeBoard(NOW)).toEqual([]);
+		expect(await repo.takeBoard(NOW, 100)).toEqual([]);
 		expect(await repo.listActive(100)).toEqual([]);
 	});
 });
@@ -263,7 +290,7 @@ describe("listArchived", () => {
 	it("1 回の takeBoard で取った行（archived_at が同値）も順序が一意になる", async () => {
 		await seed({ id: "b", body: "後に表示", showAt: "2026-10-03T07:00:00+09:00" });
 		await seed({ id: "a", body: "先に表示", showAt: "2026-10-03T06:00:00+09:00" });
-		await repo.takeBoard(NOW);
+		await repo.takeBoard(NOW, 100);
 
 		const ids = (await repo.listArchived(10)).map((r) => r.id);
 		expect(ids).toEqual(["b", "a"]);

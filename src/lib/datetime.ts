@@ -121,7 +121,7 @@ export function parseJstDue(input: string): string {
 	return build(year, month, day, 23, 59, 0);
 }
 
-/** 保存形式の先頭 10 文字（`YYYY-MM-DD`）を UTC 正午の epoch 日数に直す。 */
+/** 保存形式の先頭 10 文字（`YYYY-MM-DD`）を UTC 午前 0 時基準の epoch 日数に直す。 */
 function calendarDayIndex(dt: string): number {
 	const match = DATE_PATTERN.exec(dt.slice(0, 10));
 	if (!match) {

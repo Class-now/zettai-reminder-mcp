@@ -164,6 +164,21 @@ describe("checkBoard", () => {
 		expect((await latestCheck()).duration_ms).toBe(0);
 	});
 
+	it("1 回で返すのは 50 件までで、残りは次の呼び出しで返る", async () => {
+		for (let i = 0; i < 52; i += 1) {
+			await service.addReminder({ body: `項目 ${i}`, kind: "auto" });
+		}
+
+		const first = await service.checkBoard();
+		expect(first.count).toBe(50);
+		expect(first.items).toHaveLength(50);
+
+		const second = await service.checkBoard();
+		expect(second.count).toBe(2);
+
+		expect((await service.checkBoard()).count).toBe(0);
+	});
+
 	it("3 回呼ぶと参照記録が 3 行増え、同じリマインダーは 1 回しか返らない", async () => {
 		await service.addReminder({ body: "一度だけ", kind: "explicit" });
 
