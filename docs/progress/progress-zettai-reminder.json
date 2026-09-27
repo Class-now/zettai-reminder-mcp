@@ -2,44 +2,74 @@
   "schema_version": "1.0",
   "project": "絶対伝えろよリマインダー",
   "source_document": "docs/process.md（PM補完版）",
-  "last_updated": "2026-09-27T23:59:00+09:00",
+  "last_updated": "2026-09-27T18:35:00+09:00",
   "session_count": 2,
   "notion_pages": {
     "technical_design": null,
     "process_document": null
   },
   "current_phase": "Phase 2",
-  "current_task": "TASK-P2-001",
-  "summary": "Phase 1（MCP サーバー本体）を全 5 タスク完了。次は Phase 2 のリモート環境構築（D1/KV 作成・secret 設定・デプロイ）。",
+  "current_task": "TASK-P2-002",
+  "summary": "Phase 1 を main にマージ（テスト130件）。本番 D1(enam)/KV 作成・マイグレーション・デプロイ済み、未認証401確認済み。GITHUB_CLIENT_SECRET の設定（本人）待ち。",
   "phases": {
     "Phase 1": {
-      "status": "completed",
+      "status": "complete",
       "tasks": {
         "TASK-P1-001": {
-          "status": "completed",
-          "ralphex_plan": "phase1-reminder-mcp.md"
+          "status": "complete",
+          "ralphex_plan": "phase1-reminder-mcp.md",
+          "completed_at": "2026-09-27T18:25:00+09:00"
         },
         "TASK-P1-002": {
-          "status": "completed",
-          "ralphex_plan": "phase1-reminder-mcp.md"
+          "status": "complete",
+          "ralphex_plan": "phase1-reminder-mcp.md",
+          "completed_at": "2026-09-27T18:25:00+09:00"
         },
         "TASK-P1-003": {
-          "status": "completed",
-          "ralphex_plan": "phase1-reminder-mcp.md"
+          "status": "complete",
+          "ralphex_plan": "phase1-reminder-mcp.md",
+          "completed_at": "2026-09-27T18:25:00+09:00"
         },
         "TASK-P1-004": {
-          "status": "completed",
-          "ralphex_plan": "phase1-reminder-mcp.md"
+          "status": "complete",
+          "ralphex_plan": "phase1-reminder-mcp.md",
+          "completed_at": "2026-09-27T18:25:00+09:00"
         },
         "TASK-P1-005": {
-          "status": "completed",
-          "ralphex_plan": "phase1-reminder-mcp.md"
+          "status": "complete",
+          "ralphex_plan": "phase1-reminder-mcp.md",
+          "completed_at": "2026-09-27T18:25:00+09:00"
         }
       }
     },
     "Phase 2": {
-      "status": "not_started",
-      "tasks": {}
+      "status": "in_progress",
+      "tasks": {
+        "TASK-P2-001": {
+          "status": "complete",
+          "verification": {
+            "notes": "D1 0668dcaf (enam), KV zettai-reminder-oauth を list で確認"
+          }
+        },
+        "TASK-P2-002": {
+          "status": "in_progress",
+          "verification": {
+            "notes": "GitHub OAuth App 作成済み・GITHUB_CLIENT_ID/COOKIE_ENCRYPTION_KEY 設定済み。GITHUB_CLIENT_SECRET は本人入力待ち"
+          }
+        },
+        "TASK-P2-003": {
+          "status": "complete",
+          "verification": {
+            "notes": "remote migration 適用・deploy 済み・未認証/偽トークン 15/15 で 401"
+          }
+        },
+        "TASK-P2-004": {
+          "status": "not_started"
+        },
+        "TASK-P2-005": {
+          "status": "not_started"
+        }
+      }
     },
     "Phase 3": {
       "status": "not_started",
@@ -75,13 +105,24 @@
       "related_task": "TASK-P2-002",
       "urgency": "低",
       "status": "pending"
+    },
+    {
+      "id": "PFB-001",
+      "type": "PFB",
+      "destination": "環境",
+      "description": "ralphex の codex 外部レビューが使えない（既定 gpt-5.5 は 404、~/.codex の gpt-5.6-sol は ChatGPT アカウント非対応）。Phase1 は codex レビューなしでマージ",
+      "related_task": "TASK-P1-005",
+      "urgency": "低",
+      "status": "pending"
     }
   ],
   "session_log": [
     {
+      "session": 1,
       "date": "2026-09-27",
-      "phase": "Phase 1",
-      "note": "TASK-P1-001〜005 完了。Worker/OAuth/McpAgent 骨格、JST 固定 datetime、D1 スキーマとリポジトリ、MCP 5 ツールとサーバー指示文、運用ドキュメントと処理時間集計スクリプト。typecheck / test（104 件）/ dry-run 通過。コードレビューの指摘を反映済み。"
+      "started_at": "TASK-P1-001",
+      "ended_at": "TASK-P2-002",
+      "summary": "プラン生成→ralphex実行（5hリミットで1回中断・再開）→独立検証→mainマージ→本番デプロイ"
     }
   ]
 }
