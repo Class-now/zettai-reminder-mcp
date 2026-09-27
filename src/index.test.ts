@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReminderRepo } from "./repo/reminders";
 
 // node 環境の vitest では agents/mcp・workers-oauth-provider・auth/github-handler が
 // `cloudflare:` スキームの import を辿って読み込めないため、最小モックを挟む。
@@ -35,6 +36,14 @@ vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
 }));
 
 vi.mock("./auth/github-handler", () => ({ GitHubHandler: {} }));
+
+const registerReminderTools =
+	vi.fn<(server: unknown, deps: { repo: unknown; clock?: () => number }) => void>();
+
+vi.mock("./tools/register", () => ({
+	registerReminderTools: (server: unknown, deps: { repo: unknown; clock?: () => number }) =>
+		registerReminderTools(server, deps),
+}));
 
 const worker = await import("./index");
 
@@ -86,16 +95,41 @@ describe("worker entry", () => {
 	});
 });
 
+type ReminderMCPInstance = {
+	server: { info: unknown; options: unknown };
+	env: { DB: unknown };
+	init(): Promise<void>;
+};
+
+function newAgent(): ReminderMCPInstance {
+	const instance = new (worker.ReminderMCP as unknown as new () => ReminderMCPInstance)();
+	instance.env = { DB: {} };
+	return instance;
+}
+
 describe("ReminderMCP", () => {
+	beforeEach(() => {
+		registerReminderTools.mockReset();
+	});
+
 	it("サーバー名・バージョンと指示文を McpServer に渡す", async () => {
 		const { SERVER_INSTRUCTIONS } = await import("./instructions");
-		const instance = new (worker.ReminderMCP as unknown as new () => {
-			server: { info: unknown; options: unknown };
-			init(): Promise<void>;
-		})();
+		const instance = newAgent();
 
 		expect(instance.server.info).toEqual({ name: "絶対伝えろよリマインダー", version: "0.1.0" });
 		expect(instance.server.options).toEqual({ instructions: SERVER_INSTRUCTIONS });
 		await expect(instance.init()).resolves.toBeUndefined();
+	});
+
+	it("init() が registerReminderTools に server と DB のリポジトリを渡す", async () => {
+		const instance = newAgent();
+
+		await instance.init();
+
+		expect(registerReminderTools).toHaveBeenCalledTimes(1);
+		const [server, deps] = registerReminderTools.mock.calls[0];
+		expect(server).toBe(instance.server);
+		expect(deps.repo).toBeInstanceOf(ReminderRepo);
+		expect(deps.clock).toBe(Date.now);
 	});
 });

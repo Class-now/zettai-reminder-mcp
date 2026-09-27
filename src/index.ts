@@ -4,6 +4,8 @@ import { McpAgent } from "agents/mcp";
 import { GitHubHandler } from "./auth/github-handler";
 import type { Props } from "./auth/utils";
 import { SERVER_INSTRUCTIONS } from "./instructions";
+import { ReminderRepo } from "./repo/reminders";
+import { registerReminderTools } from "./tools/register";
 import type { Env } from "./types";
 
 export class ReminderMCP extends McpAgent<Env, Record<string, never>, Props> {
@@ -13,7 +15,10 @@ export class ReminderMCP extends McpAgent<Env, Record<string, never>, Props> {
 	);
 
 	async init() {
-		// Task 4 で registerReminderTools(this.server, deps) を呼ぶ
+		registerReminderTools(this.server, {
+			repo: new ReminderRepo(this.env.DB),
+			clock: Date.now,
+		});
 	}
 }
 

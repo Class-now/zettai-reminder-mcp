@@ -247,18 +247,18 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
 
 **Requirements**: REQ-F001〜REQ-F003、REQ-F005、REQ-F006、REQ-F013、REQ-F014、REQ-F015〜REQ-F020、REQ-F023〜REQ-F025、REQ-F027〜REQ-F030、REQ-N001、REQ-N002、REQ-N006。
 
-- [ ] 5 ツール（`check_board`、`add_reminder`、`list_reminders`、`update_reminder`、`delete_reminder`）が `registerReminderTools` で登録され、`ReminderMCP.init()` から呼ばれている
-- [ ] テスト（サービス層、`createTestD1()` を使用）: 期限 10/5・期限 10/3・期限なしの 3 件が 10/3・10/5・期限なしの順で返る
-- [ ] テスト: 期限 10/5 のリマインダーを 10/3 に取得すると `line` が `・[本文]（期限 10/5、あと 2 日）` になり、`note` が応答に含まれない
-- [ ] テスト: 0 件の `check_board` の text が正確に `{"count":0,"items":[]}` で、`board_checks` に `returned_count=0, ok=1` の行が 1 件増える
-- [ ] テスト: `check_board` を 3 回呼ぶと `board_checks` が 3 行増え、同じリマインダーは 1 回しか返らない
-- [ ] テスト: `recordCheck` が例外を投げても `check_board` は取得結果を返す。`takeBoard` が例外を投げたら `isError: true` と `DB_ERROR` を返す
-- [ ] テスト: `add_reminder` の `confirmation` が期限の有無で 2 形式になり、`show_at` 省略・過去の両方で登録時刻になる。`kind` が保存される
-- [ ] テスト: オフセット無しの `show_at` は `INVALID_DATETIME`、空の `body` は `VALIDATION_ERROR`
-- [ ] テスト: `list_reminders` の 3 ステータスが正しい集合を返し、呼んでも行の状態が変わらない（呼ぶ前後で `check_board` の結果が同じ）
-- [ ] テスト: `update_reminder` で表示時刻を未来に動かすと、その時刻より前の `check_board` には出ない。存在しない id・アーカイブ済み id は `NOT_FOUND`
-- [ ] テスト: `delete_reminder` 後は `check_board`・`list_reminders(waiting/active)` に出ない
-- [ ] `npm run typecheck`、`npm test`、`npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が通る
+- [x] 5 ツール（`check_board`、`add_reminder`、`list_reminders`、`update_reminder`、`delete_reminder`）が `registerReminderTools` で登録され、`ReminderMCP.init()` から呼ばれている
+- [x] テスト（サービス層、`createTestD1()` を使用）: 期限 10/5・期限 10/3・期限なしの 3 件が 10/3・10/5・期限なしの順で返る
+- [x] テスト: 期限 10/5 のリマインダーを 10/3 に取得すると `line` が `・[本文]（期限 10/5、あと 2 日）` になり、`note` が応答に含まれない
+- [x] テスト: 0 件の `check_board` の text が正確に `{"count":0,"items":[]}` で、`board_checks` に `returned_count=0, ok=1` の行が 1 件増える
+- [x] テスト: `check_board` を 3 回呼ぶと `board_checks` が 3 行増え、同じリマインダーは 1 回しか返らない
+- [x] テスト: `recordCheck` が例外を投げても `check_board` は取得結果を返す。`takeBoard` が例外を投げたら `isError: true` と `DB_ERROR` を返す
+- [x] テスト: `add_reminder` の `confirmation` が期限の有無で 2 形式になり、`show_at` 省略・過去の両方で登録時刻になる。`kind` が保存される
+- [x] テスト: オフセット無しの `show_at` は `INVALID_DATETIME`、空の `body` は `VALIDATION_ERROR`
+- [x] テスト: `list_reminders` の 3 ステータスが正しい集合を返し、呼んでも行の状態が変わらない（呼ぶ前後で `check_board` の結果が同じ）
+- [x] テスト: `update_reminder` で表示時刻を未来に動かすと、その時刻より前の `check_board` には出ない。存在しない id・アーカイブ済み id は `NOT_FOUND`
+- [x] テスト: `delete_reminder` 後は `check_board`・`list_reminders(waiting/active)` に出ない
+- [x] `npm run typecheck`、`npm test`、`npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が通る
 
 Do NOT implement: 会話中に表示時刻を迎えたものの即時通知、スヌーズ・繰り返し、Claude Code 向けの機能、専用 GUI、物理削除、プッシュ通知。
 
