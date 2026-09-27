@@ -191,15 +191,15 @@ CREATE TABLE board_checks (
 
 **Requirements**: REQ-F003（本文・表示時刻・期限・会話メモ・登録種別・登録日時を持つ）、REQ-F006（過去の表示時刻は即時）、REQ-F015、REQ-F017〜REQ-F020、REQ-F027（取得とアーカイブの不可分性）、REQ-F028（取得日時の記録）、REQ-F029（参照記録）、REQ-N006（二重表示 0 件）。
 
-- [ ] `migrations/0001_init.sql` が上記の 2 テーブルと部分インデックスを作る
-- [ ] `ReminderRepo` の 8 メソッドがあり、SQL はすべて `src/repo/` 内にある
-- [ ] `takeBoard` の実装が SQL 1 文（`UPDATE … RETURNING`）だけで、SELECT を先に発行しないことをコードで確認できる
-- [ ] テスト: 表示時刻が `now` ちょうどの行は取得され、`now` の 1 分後の行は取得されない
-- [ ] テスト: `takeBoard` を 2 回続けて呼ぶと、2 回目は 0 件になり、1 回目に返った行の `archived_at` が `now` になっている
-- [ ] テスト: 削除済み・アーカイブ済みの行は `takeBoard`・`listWaiting`・`listActive` に出ず、`update`・`softDelete` は 0 行（`null` / `false`）になる
-- [ ] テスト: `insert` で過去の `showAt` と省略時の `showAt` がどちらも `now` になる
-- [ ] テスト: `listArchived` が取得日時の新しい順で、`limit` を守る
-- [ ] `npm run typecheck` と `npm test` が通る
+- [x] `migrations/0001_init.sql` が上記の 2 テーブルと部分インデックスを作る
+- [x] `ReminderRepo` の 8 メソッドがあり、SQL はすべて `src/repo/` 内にある
+- [x] `takeBoard` の実装が SQL 1 文（`UPDATE … RETURNING`）だけで、SELECT を先に発行しないことをコードで確認できる
+- [x] テスト: 表示時刻が `now` ちょうどの行は取得され、`now` の 1 分後の行は取得されない
+- [x] テスト: `takeBoard` を 2 回続けて呼ぶと、2 回目は 0 件になり、1 回目に返った行の `archived_at` が `now` になっている
+- [x] テスト: 削除済み・アーカイブ済みの行は `takeBoard`・`listWaiting`・`listActive` に出ず、`update`・`softDelete` は 0 行（`null` / `false`）になる
+- [x] テスト: `insert` で過去の `showAt` と省略時の `showAt` がどちらも `now` になる
+- [x] テスト: `listArchived` が取得日時の新しい順で、`limit` を守る
+- [x] `npm run typecheck` と `npm test` が通る
 
 Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処理、利用者列（本人 1 名のみ）、スヌーズや繰り返し。
 
