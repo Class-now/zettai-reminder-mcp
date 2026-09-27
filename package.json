@@ -10,7 +10,9 @@
 		"cf-typegen": "wrangler types",
 		"deploy": "npm run typecheck && npm test && wrangler deploy",
 		"db:migrate:local": "wrangler d1 migrations apply zettai-reminder --local",
-		"db:migrate:remote": "wrangler d1 migrations apply zettai-reminder --remote"
+		"db:migrate:remote": "wrangler d1 migrations apply zettai-reminder --remote",
+		"report:checks": "wrangler d1 execute zettai-reminder --remote --command \"SELECT checked_at, returned_count, ok, error_code, duration_ms FROM board_checks ORDER BY id DESC LIMIT 50\"",
+		"report:latency": "wrangler d1 execute zettai-reminder --remote --file scripts/latency-report.sql"
 	},
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "^0.2.3",

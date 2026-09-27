@@ -299,11 +299,11 @@ Do NOT implement: 会話中に表示時刻を迎えたものの即時通知、�
 
 **Requirements**: REQ-N001（空ボード 100ms 以内）、REQ-N002（非空 500ms 以内）、REQ-N004（秘密値を書かない）、REQ-N005（遵守率計測の材料＝参照記録）、SPIKE-001。
 
-- [ ] `README.md` と `SETUP.md` があり、どちらにも指示文がそのまま載っている
-- [ ] `SETUP.md` に秘密値そのものが書かれておらず、環境変数名とコマンドだけがある
-- [ ] `SETUP.md` の callback 経路が `src/auth/github-handler.ts` の実装と一致している
-- [ ] `report:checks` と `report:latency` が `package.json` にある
-- [ ] `scripts/latency-report.sql` の集計をテストで検証している
-- [ ] `npm run typecheck`、`npm test`、`npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が通る
+- [x] `README.md` と `SETUP.md` があり、どちらにも指示文がそのまま載っている
+- [x] `SETUP.md` に秘密値そのものが書かれておらず、環境変数名とコマンドだけがある
+- [x] `SETUP.md` の callback 経路が `src/auth/github-handler.ts` の実装と一致している
+- [x] `report:checks` と `report:latency` が `package.json` にある
+- [x] `scripts/latency-report.sql` の集計をテストで検証している
+- [x] `npm run typecheck`、`npm test`、`npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が通る
 
 Do NOT implement: リモート環境への実行（D1/KV 作成・secret 設定・マイグレーション・デプロイ・claude.ai の設定変更。これらは Phase 2 で PM が行う）、遵守率の自動計算（分母を自動取得できないため）、ダッシュボード。
