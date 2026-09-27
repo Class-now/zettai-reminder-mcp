@@ -76,6 +76,9 @@ const DELETE_REMINDER_DESCRIPTION =
 
 const JST_HINT = "日本時間の YYYY-MM-DDTHH:MM:SS+09:00 形式";
 
+// 任意の入力はすべて `null` を省略と同じに受ける（`nullish()` / `nullable()`）。
+// zod で落ちると MCP SDK が先に弾いてしまい、共通の `{ error: { code, message } }`
+// 封筒に載らないまま呼び出しごと失敗するため。
 const addShape = {
 	body: z.string().describe("リマインダーの本文（1〜200 文字。改行は半角スペースに畳まれる）"),
 	kind: z.enum(["explicit", "auto"]).describe("依頼による登録は explicit、自動登録は auto"),
@@ -94,13 +97,15 @@ const listShape = {
 		.int()
 		.min(1)
 		.max(100)
-		.optional()
-		.describe("返す件数の上限（1〜100）。既定は archived が 20、waiting / active が 100"),
+		.nullish()
+		.describe(
+			"返す件数の上限（1〜100）。省略または null で既定（archived が 20、waiting / active が 100）",
+		),
 };
 
 const updateShape = {
 	id: z.string().describe("対象のリマインダー id"),
-	body: z.string().optional().describe("新しい本文（1〜200 文字）"),
+	body: z.string().nullish().describe("新しい本文（1〜200 文字）。null は指定なしと同じ"),
 	show_at: z.string().nullish().describe(`新しい表示時刻（${JST_HINT}）。null は指定なしと同じ`),
 	due_at: z.string().nullable().optional().describe(`新しい期限。null で期限を消す`),
 	note: z.string().nullable().optional().describe("新しい会話メモ（1000 文字以内）。null で消す"),

@@ -52,13 +52,17 @@ export interface AddReminderInput {
 
 export interface ListRemindersInput {
 	status: ReminderStatus;
-	limit?: number;
+	/** `null` は省略と同じ（ステータスごとの既定値を使う）。 */
+	limit?: number | null;
 }
 
-/** `due_at` と `note` は `null` で消去、省略（`undefined`）は現状維持。 */
+/**
+ * `due_at` と `note` は `null` で消去、省略（`undefined`）は現状維持。
+ * `body` と `show_at` は消せない列なので `null` は省略と同じに扱う。
+ */
 export interface UpdateReminderInput {
 	id: string;
-	body?: string;
+	body?: string | null;
 	show_at?: string | null;
 	due_at?: string | null;
 	note?: string | null;
@@ -373,11 +377,11 @@ export class ReminderService {
 
 	async updateReminder(input: UpdateReminderInput): Promise<UpdateReminderResult> {
 		const patch: UpdateReminderPatch = {};
-		if (input.body !== undefined) {
+		// body / show_at は消せない列なので、`null` は `add_reminder` と同じく「指定なし」として扱う
+		// （`due_at` / `note` の消去に使う `null` をそのまま渡されても封筒外で落ちないようにする）。
+		if (input.body != null) {
 			patch.body = requireBody(input.body);
 		}
-		// show_at は消せない列なので、`null` は `add_reminder` と同じく「指定なし」として扱う
-		// （`due_at` / `note` の消去に使う `null` をそのまま渡されても封筒外で落ちないようにする）。
 		if (input.show_at != null) {
 			patch.showAt = parseJstDateTime(input.show_at);
 		}
@@ -416,8 +420,8 @@ export class ReminderService {
 		return { deleted: id };
 	}
 
-	private listLimit(limit: number | undefined, fallback: number): number {
-		if (limit === undefined) {
+	private listLimit(limit: number | null | undefined, fallback: number): number {
+		if (limit == null) {
 			return fallback;
 		}
 		if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {

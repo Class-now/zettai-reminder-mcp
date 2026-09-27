@@ -171,12 +171,13 @@ describe("入力スキーマ（zod）", () => {
 		).toBe(true);
 	});
 
-	it("update_reminder は show_at の null を指定なしと同じに受ける", () => {
-		// show_at は消せない列だが、due_at / note と同じ形で null が来ても
+	it("update_reminder は body / show_at の null を指定なしと同じに受ける", () => {
+		// body / show_at は消せない列だが、due_at / note と同じ形で null が来ても
 		// zod で落として封筒外のエラーにしない
 		const schema = schemaOf("update_reminder");
 
 		expect(schema.safeParse({ id: "r1", show_at: null, note: "メモ" }).success).toBe(true);
+		expect(schema.safeParse({ id: "r1", body: null, note: "メモ" }).success).toBe(true);
 	});
 
 	it("list_reminders は status を 3 値に限り、limit を 1〜100 の整数に限る", () => {
@@ -189,6 +190,13 @@ describe("入力スキーマ（zod）", () => {
 		expect(schema.safeParse({ status: "archived", limit: 101 }).success).toBe(false);
 		expect(schema.safeParse({ status: "archived", limit: 1.5 }).success).toBe(false);
 		expect(schema.safeParse({ status: "done" }).success).toBe(false);
+	});
+
+	it("list_reminders は limit の null を省略と同じに受ける", () => {
+		// 任意の項目に null が来ても zod で落とさない（封筒外のエラーにしない）
+		expect(schemaOf("list_reminders").safeParse({ status: "active", limit: null }).success).toBe(
+			true,
+		);
 	});
 
 	it("update_reminder は due_at / note に null を許し、delete_reminder は id を必須にする", () => {

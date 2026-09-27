@@ -452,6 +452,8 @@ describe("listReminders", () => {
 	it("limit の境界（1 と 100）は通る", async () => {
 		expect((await service.listReminders({ status: "archived", limit: 1 })).count).toBe(0);
 		expect((await service.listReminders({ status: "archived", limit: 100 })).count).toBe(0);
+		// null は省略と同じ（ステータスごとの既定値を使う）
+		expect((await service.listReminders({ status: "active", limit: null })).count).toBe(2);
 	});
 
 	it("archived の limit は実際に件数を絞り、既定（20）までは全件返す", async () => {
@@ -557,9 +559,21 @@ describe("updateReminder", () => {
 		expect(withNullShowAt.reminder.show_at).toBe(added.reminder.show_at);
 		expect(withNullShowAt.reminder.note).toBe("残す");
 
+		// body も消せない列なので null は「指定なし」。他の項目だけが変わる
+		const withNullBody = await service.updateReminder({
+			id: added.reminder.id,
+			body: null,
+			note: "本文はそのまま",
+		});
+		expect(withNullBody.reminder.body).toBe(collapsed.reminder.body);
+		expect(withNullBody.reminder.note).toBe("本文はそのまま");
+
 		// null だけなら指定が無いのと同じで VALIDATION_ERROR
 		await expect(
 			service.updateReminder({ id: added.reminder.id, show_at: null }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+		await expect(
+			service.updateReminder({ id: added.reminder.id, body: null }),
 		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
 		await expect(
