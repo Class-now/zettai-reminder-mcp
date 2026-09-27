@@ -118,6 +118,14 @@ describe("parseJstDue", () => {
 		expect(() => parseJstDue("2026-02-30")).toThrow(DateTimeError);
 		expect(() => parseJstDue("2026-13-01")).toThrow(DateTimeError);
 	});
+
+	it("形式違反のエラーは日付のみの形式も受け付けることを伝える", () => {
+		// 0 埋めしていない "2026-1-5" は日時側の regex にも合わないので、
+		// 日時だけを案内すると「YYYY-MM-DD で良い」ことが伝わらない
+		expect(() => parseJstDue("2026-1-5")).toThrow(/YYYY-MM-DD/);
+		expect(() => parseJstDue("2026-1-5")).toThrow(/YYYY-MM-DDTHH:MM\+09:00/);
+		expect(() => parseJstDue("来週")).toThrow(DateTimeError);
+	});
 });
 
 describe("daysUntil", () => {

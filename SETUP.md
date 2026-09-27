@@ -2,7 +2,9 @@
 
 絶対伝えろよリマインダーを Cloudflare にデプロイし、claude.ai のカスタムコネクタとして接続するまでの手順。上から順に実行する。
 
-このファイルには秘密値そのものを書かない。書くのは環境変数名とコマンドだけ。`wrangler secret put` で貼り付けた値や `database_id` などを、このファイルや他のドキュメント・Git に書き戻さないこと。
+このファイルには秘密値そのものを書かない。書くのは環境変数名とコマンドだけ。`wrangler secret put` で貼り付けた値（`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `COOKIE_ENCRYPTION_KEY`）を、このファイルや他のドキュメント・Git に書き戻さないこと。
+
+D1 の `database_id` と KV の `id` は秘密値ではなく Worker の設定値なので、手順 1・2 のとおり `wrangler.jsonc`（Git 管理下）に書いてコミットする。ドキュメントには書かない。
 
 前提: Node 24 以上が入っていて `npm install` が済んでいること（テストが D1 を `node:sqlite` で代替するため、これより古い Node では `npm test` が動かず `npm run deploy` も通らない）。Cloudflare アカウントに `npx wrangler login` でログインしていること。
 

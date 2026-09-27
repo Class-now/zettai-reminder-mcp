@@ -223,6 +223,50 @@ describe("checkBoard", () => {
 	});
 });
 
+describe("checkBoard の上限と並びの安定性", () => {
+	it("期限も表示時刻も同じなら id 昇順で並ぶ（RETURNING の行順に依存しない）", async () => {
+		const a = await service.addReminder({ body: "同着 A", kind: "auto", due_at: "2026-10-05" });
+		const b = await service.addReminder({ body: "同着 B", kind: "auto", due_at: "2026-10-05" });
+		const c = await service.addReminder({ body: "同着 C", kind: "auto", due_at: "2026-10-05" });
+
+		const expected = [a.reminder, b.reminder, c.reminder]
+			.map((r) => ({ id: r.id, body: r.body }))
+			.sort((x, y) => (x.id < y.id ? -1 : 1))
+			.map((r) => r.body);
+
+		const board = await service.checkBoard();
+		expect(board.items.map((i) => i.show_at)).toEqual([NOW, NOW, NOW]);
+		expect(board.items.map((i) => i.due_at)).toEqual([
+			"2026-10-05T23:59:00+09:00",
+			"2026-10-05T23:59:00+09:00",
+			"2026-10-05T23:59:00+09:00",
+		]);
+		expect(board.items.map((i) => i.body)).toEqual(expected);
+	});
+
+	it("50 件で打ち切ったら has_more が付き、残りは次の呼び出しで返る", async () => {
+		for (let i = 0; i < 51; i += 1) {
+			await service.addReminder({ body: `件 ${i}`, kind: "auto" });
+		}
+
+		const first = await service.checkBoard();
+		expect(first.count).toBe(50);
+		expect(first.has_more).toBe(true);
+
+		const second = await service.checkBoard();
+		expect(second.count).toBe(1);
+		expect(second.has_more).toBeUndefined();
+	});
+
+	it("上限に届かなければ has_more は付かず、0 件の JSON の形も変わらない", async () => {
+		expect(JSON.stringify(await service.checkBoard())).toBe('{"count":0,"items":[]}');
+
+		await service.addReminder({ body: "1 件だけ", kind: "auto" });
+		const board = await service.checkBoard();
+		expect(board.has_more).toBeUndefined();
+	});
+});
+
 describe("addReminder", () => {
 	it("期限の有無で confirmation が 2 形式になる", async () => {
 		const withDue = await service.addReminder({
@@ -270,6 +314,45 @@ describe("addReminder", () => {
 		await expect(service.addReminder({ body: "   ", kind: "explicit" })).rejects.toMatchObject({
 			code: "VALIDATION_ERROR",
 		});
+	});
+
+	it("body は前後を落として 1 行に畳む（line と confirmation が複数行にならない）", async () => {
+		const added = await service.addReminder({ body: "  ゴミを\n出す  ", kind: "explicit" });
+
+		expect(added.reminder.body).toBe("ゴミを 出す");
+		expect(added.confirmation).toBe("登録しました：ゴミを 出す（表示 10/3 08:00）");
+		expect(added.confirmation).not.toContain("\n");
+
+		const board = await service.checkBoard();
+		expect(board.items[0].line).toBe("・ゴミを 出す");
+		expect(board.items[0].line).not.toContain("\n");
+	});
+
+	it("body は 200 文字まで、201 文字は VALIDATION_ERROR", async () => {
+		const ok = await service.addReminder({ body: "あ".repeat(200), kind: "explicit" });
+		expect(ok.reminder.body.length).toBe(200);
+
+		await expect(
+			service.addReminder({ body: "あ".repeat(201), kind: "explicit" }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+	});
+
+	it("note は空白だけなら null になり、1000 文字を超えると VALIDATION_ERROR", async () => {
+		const blank = await service.addReminder({ body: "メモなし", kind: "auto", note: "   " });
+		expect(blank.reminder.note).toBeNull();
+
+		const trimmed = await service.addReminder({ body: "メモあり", kind: "auto", note: "  会話  " });
+		expect(trimmed.reminder.note).toBe("会話");
+
+		await expect(
+			service.addReminder({ body: "長すぎ", kind: "auto", note: "あ".repeat(1001) }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+	});
+
+	it("知らない kind は VALIDATION_ERROR（zod を通さず呼んでも弾く）", async () => {
+		await expect(
+			service.addReminder({ body: "本文", kind: "maybe" as never }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 	});
 });
 
@@ -325,6 +408,40 @@ describe("listReminders", () => {
 		expect((await service.listReminders({ status: "archived", limit: 100 })).count).toBe(0);
 	});
 
+	it("archived の limit は実際に件数を絞り、既定（20）までは全件返す", async () => {
+		await service.addReminder({ body: "取得できる 2", kind: "explicit" });
+		await service.addReminder({ body: "取得できる 3", kind: "explicit" });
+		await service.checkBoard();
+
+		expect((await service.listReminders({ status: "archived", limit: 1 })).count).toBe(1);
+		expect((await service.listReminders({ status: "archived", limit: 2 })).count).toBe(2);
+		expect((await service.listReminders({ status: "archived" })).count).toBe(3);
+	});
+
+	it("limit で切り捨てたときだけ has_more が付く", async () => {
+		const truncated = await service.listReminders({ status: "active", limit: 1 });
+		expect(truncated.has_more).toBe(true);
+		expect(truncated.count).toBe(1);
+
+		const whole = await service.listReminders({ status: "active", limit: 2 });
+		expect(whole.has_more).toBeUndefined();
+		expect(whole.count).toBe(2);
+
+		expect((await service.listReminders({ status: "waiting", limit: 1 })).has_more).toBeUndefined();
+	});
+
+	it("limit が整数でなければ VALIDATION_ERROR（zod を通さず呼んでも弾く）", async () => {
+		await expect(service.listReminders({ status: "active", limit: 1.5 })).rejects.toMatchObject({
+			code: "VALIDATION_ERROR",
+		});
+	});
+
+	it("知らない status は VALIDATION_ERROR", async () => {
+		await expect(
+			service.listReminders({ status: "done" as never }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+	});
+
 	it("archived の limit は範囲外なら VALIDATION_ERROR", async () => {
 		await expect(
 			service.listReminders({ status: "archived", limit: 0 }),
@@ -370,6 +487,24 @@ describe("updateReminder", () => {
 		expect(updated.reminder.due_at).toBeNull();
 		expect(updated.reminder.note).toBeNull();
 		expect(updated.confirmation).toBe("更新しました：期限つき（表示 10/4 09:00）");
+	});
+
+	it("空白だけの body は VALIDATION_ERROR、note の空文字は消去になる", async () => {
+		const added = await service.addReminder({ body: "直す", kind: "explicit", note: "メモ" });
+
+		await expect(
+			service.updateReminder({ id: added.reminder.id, body: "   " }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+		const cleared = await service.updateReminder({ id: added.reminder.id, note: "" });
+		expect(cleared.reminder.note).toBeNull();
+
+		const collapsed = await service.updateReminder({ id: added.reminder.id, body: " 新\nしい " });
+		expect(collapsed.reminder.body).toBe("新 しい");
+
+		await expect(
+			service.updateReminder({ id: added.reminder.id, body: "あ".repeat(201) }),
+		).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 	});
 
 	it("存在しない id・アーカイブ済み id は NOT_FOUND", async () => {

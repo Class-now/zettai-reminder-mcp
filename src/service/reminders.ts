@@ -72,6 +72,8 @@ export interface BoardResponseItem {
 
 export interface CheckBoardResult {
 	count: number;
+	/** 上限に達して取り切れなかったときだけ `true` が付く（0 件の応答の形は変えない）。 */
+	has_more?: true;
 	items: BoardResponseItem[];
 }
 
@@ -102,6 +104,8 @@ export interface UpdateReminderResult {
 export interface ListRemindersResult {
 	status: ReminderStatus;
 	count: number;
+	/** `limit` で切り捨てた分があるときだけ `true` が付く。 */
+	has_more?: true;
 	items: ListReminderPayload[];
 }
 
@@ -114,6 +118,13 @@ export interface DeleteReminderResult {
  * 上限であり、超えた分は残って次の `check_board` で返る（失われない）。
  */
 const BOARD_TAKE_LIMIT = 50;
+/**
+ * 本文と会話メモの長さの上限。件数の上限（`BOARD_TAKE_LIMIT`）だけでは 1 行あたりの
+ * 大きさが青天井で、D1 の応答上限（1MB）を 50 行で超えると `takeBoard` が失敗し続けて
+ * 恒久的に詰まる。Claude の文脈を圧迫しないための上限でもある。
+ */
+const MAX_BODY_LENGTH = 200;
+const MAX_NOTE_LENGTH = 1000;
 const DEFAULT_ARCHIVED_LIMIT = 20;
 /** waiting / active は「重複確認」用なので既定でも上限まで返す。 */
 const DEFAULT_LIST_LIMIT = 100;
@@ -165,7 +176,11 @@ function compareText(a: string, b: string): number {
 	return a < b ? -1 : 1;
 }
 
-/** 期限の近い順、期限なしは後ろ、同じ期限（や期限なし同士）は表示時刻の昇順。 */
+/**
+ * 期限の近い順、期限なしは後ろ、同じ期限（や期限なし同士）は表示時刻の昇順。
+ * `UPDATE … RETURNING` の行順は保証されないので、期限も表示時刻も同じときは
+ * `id` まで見て順序を一意にする（同じ入力なら必ず同じ並びになる）。
+ */
 function compareBoardItems(a: BoardItem, b: BoardItem): number {
 	if (a.dueAt !== b.dueAt) {
 		if (a.dueAt === null) {
@@ -176,15 +191,28 @@ function compareBoardItems(a: BoardItem, b: BoardItem): number {
 		}
 		return compareText(a.dueAt, b.dueAt);
 	}
-	return compareText(a.showAt, b.showAt);
+	if (a.showAt !== b.showAt) {
+		return compareText(a.showAt, b.showAt);
+	}
+	return compareText(a.id, b.id);
 }
 
+/**
+ * 本文は表示用の 1 行（`line`）と確認文（`confirmation`）にそのまま埋め込まれるので、
+ * 改行を含む連続した空白は半角スペース 1 個に畳んで必ず 1 行にする。
+ */
 function requireBody(body: string): string {
-	const trimmed = body.trim();
-	if (trimmed.length === 0) {
+	const collapsed = body.replace(/\s+/g, " ").trim();
+	if (collapsed.length === 0) {
 		throw new ServiceError("VALIDATION_ERROR", "body は 1 文字以上にしてください");
 	}
-	return trimmed;
+	if (collapsed.length > MAX_BODY_LENGTH) {
+		throw new ServiceError(
+			"VALIDATION_ERROR",
+			`body は ${MAX_BODY_LENGTH} 文字以内にしてください（${collapsed.length} 文字）`,
+		);
+	}
+	return collapsed;
 }
 
 /** 空文字の会話メモは「無し」として扱う。 */
@@ -193,6 +221,12 @@ function normalizeNote(note: string | null | undefined): string | null {
 		return null;
 	}
 	const trimmed = note.trim();
+	if (trimmed.length > MAX_NOTE_LENGTH) {
+		throw new ServiceError(
+			"VALIDATION_ERROR",
+			`note は ${MAX_NOTE_LENGTH} 文字以内にしてください（${trimmed.length} 文字）`,
+		);
+	}
 	return trimmed.length === 0 ? null : trimmed;
 }
 
@@ -205,7 +239,9 @@ export class ReminderService {
 	/**
 	 * メインボードの取得。`takeBoard` が取得とアーカイブを不可分に行うので、
 	 * 同じリマインダーが 2 回返ることはない。1 回で返すのは `BOARD_TAKE_LIMIT`
-	 * 件までで、超えた分は次の `check_board` に回る。参照記録の失敗は握りつぶす。
+	 * 件までで、超えた分は次の `check_board` に回る。取り切れなかった可能性があるときは
+	 * `has_more: true` を付けて黙って隠さない（ちょうど上限で尽きた場合も `true` になるが、
+	 * 残りを見落とすより過剰に知らせる方を採る）。参照記録の失敗は握りつぶす。
 	 */
 	async checkBoard(): Promise<CheckBoardResult> {
 		const startedMs = this.clock();
@@ -238,7 +274,10 @@ export class ReminderService {
 				line: boardLine(item.body, item.dueAt, daysLeft),
 			};
 		});
-		const result: CheckBoardResult = { count: items.length, items };
+		const result: CheckBoardResult =
+			taken.length === BOARD_TAKE_LIMIT
+				? { count: items.length, has_more: true, items }
+				: { count: items.length, items };
 
 		await this.safeRecord({
 			checkedAt: now,
@@ -275,22 +314,28 @@ export class ReminderService {
 		};
 	}
 
-	/** 一覧。どの行の状態も変えない。 */
+	/**
+	 * 一覧。どの行の状態も変えない。`limit` より 1 件多く取って切り捨てることで、
+	 * 打ち切りがあったかを追加の問い合わせなしに判定し `has_more: true` で知らせる
+	 * （重複確認の一覧が黙って欠けると、重複登録に気づけない）。
+	 */
 	async listReminders(input: ListRemindersInput): Promise<ListRemindersResult> {
 		const now = nowJst(this.clock());
 
-		let reminders: Reminder[];
+		let limit: number;
+		let fetched: Reminder[];
 		switch (input.status) {
 			case "waiting":
-				reminders = await this.repo.listWaiting(now, this.listLimit(input.limit, DEFAULT_LIST_LIMIT));
+				limit = this.listLimit(input.limit, DEFAULT_LIST_LIMIT);
+				fetched = await this.repo.listWaiting(now, limit + 1);
 				break;
 			case "active":
-				reminders = await this.repo.listActive(this.listLimit(input.limit, DEFAULT_LIST_LIMIT));
+				limit = this.listLimit(input.limit, DEFAULT_LIST_LIMIT);
+				fetched = await this.repo.listActive(limit + 1);
 				break;
 			case "archived":
-				reminders = await this.repo.listArchived(
-					this.listLimit(input.limit, DEFAULT_ARCHIVED_LIMIT),
-				);
+				limit = this.listLimit(input.limit, DEFAULT_ARCHIVED_LIMIT);
+				fetched = await this.repo.listArchived(limit + 1);
 				break;
 			default:
 				throw new ServiceError(
@@ -299,7 +344,11 @@ export class ReminderService {
 				);
 		}
 
-		return { status: input.status, count: reminders.length, items: reminders.map(listPayload) };
+		const reminders = fetched.slice(0, limit);
+		const items = reminders.map(listPayload);
+		return fetched.length > limit
+			? { status: input.status, count: items.length, has_more: true, items }
+			: { status: input.status, count: items.length, items };
 	}
 
 	async updateReminder(input: UpdateReminderInput): Promise<UpdateReminderResult> {

@@ -18,13 +18,16 @@
 - D1 への SQL は `src/repo/` にだけ書く。`src/repo/` は時計を読まない（現在時刻は呼び出し側が `now` として渡す）
 - 層は 3 つに固定する。`src/tools/` は zod の入力スキーマと応答形式の変換だけ、`src/service/` が処理本体（MCP の型を import しない＝テストから直接呼べる）、`src/repo/` が SQL だけ
 - 並び順・残り日数・表示用の 1 行（`line`）・確認文（`confirmation`）は必ず `src/service/` で作る。Claude に計算や整形をさせない
-- ツールの応答形式は共通。成功は `{ content: [{ type: "text", text: JSON.stringify(result) }] }`、失敗は `isError: true` と `{ error: { code, message } }`。コードは `INVALID_DATETIME` / `VALIDATION_ERROR` / `NOT_FOUND` / `DB_ERROR` の 4 つだけ（`src/tools/register.ts` の `run()` が例外から変換する）
+- `line` と `confirmation` は 1 行であることが前提なので、`body` は連続する空白と改行を半角スペース 1 個に畳んでから保存する。`check_board` の応答に会話メモ（`note`）は入れない（`list_reminders` だけが返す）
+- ツールの応答形式は共通。成功は `{ content: [{ type: "text", text: JSON.stringify(result) }] }`、失敗は `isError: true` と `{ error: { code, message } }`。コードは `INVALID_DATETIME` / `VALIDATION_ERROR` / `NOT_FOUND` / `DB_ERROR` の 4 つだけ（`src/tools/register.ts` の `run()` が例外から変換する）。この封筒に載るのはハンドラ内の例外だけで、zod の入力スキーマ違反は MCP SDK 側が先に弾く。だから `src/service/` の検証は zod と二重でも消さない（サービス層は MCP を通さず直接呼べる前提）
 - 状態列は持たない。`show_at` / `archived_at` / `deleted_at` と `now` の比較で waiting / board / active / archived を決める。日時列は全行同じオフセットなので文字列の辞書順比較がそのまま時刻比較になり、SQL はそれに依存している
-- 一覧は必ず `LIMIT` を持たせる（Claude の文脈に無制限に流し込まない）
+- 一覧は必ず `LIMIT` を持たせる（Claude の文脈に無制限に流し込まない）。上限は `check_board` が 1 回 50 件、`list_reminders` が既定 archived 20 / waiting・active 100 で最大 100、`body` 200 文字・`note` 1000 文字
+- 打ち切ったときは黙って隠さず `has_more: true` を付ける。`check_board` の取りこぼしも `list_reminders` の重複確認の欠落も、サイレントだと product の前提（絶対伝える・重複を作らない）が崩れる
 - `worker-configuration.d.ts` は `npm run cf-typegen` の生成物。手で直さず、binding を変えたら再生成してコミットする。secret の型は `wrangler types` が出さないので `worker-env.d.ts` に手で足す
 - 秘密値をコード・ドキュメント・Git に書かない。環境変数名だけを書く
 - `src/auth/` は personal-rag-mcp からの流用。表示名・説明文以外は変更しない
-- 指示文は 3 か所にある（`src/instructions.ts` の `SERVER_INSTRUCTIONS`、README.md、SETUP.md 手順 8）。片方だけ直さず同時に直す。`SERVER_INSTRUCTIONS` は 8 行以内・空行なし（`src/instructions.test.ts` が固定している）
+- 指示文は 3 か所にある（`src/instructions.ts` の `SERVER_INSTRUCTIONS`、README.md、SETUP.md 手順 8）。片方だけ直さず同時に直す。`SERVER_INSTRUCTIONS` は 8 行以内・空行なし。README.md と SETUP.md のブロックは一字一句同じ（`src/instructions.test.ts` が両方を固定している）
+- 仕様（SQL の要旨・ツールの入出力・上限）を実装で変えたら、`docs/plans/<phase>.md` の本文も同じコミットで直す。プランは完了チェックだけ付けて放置しない
 
 ## テスト
 

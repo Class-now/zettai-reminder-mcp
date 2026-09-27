@@ -179,9 +179,9 @@ CREATE TABLE board_checks (
 | `takeBoard(now, limit)` | `UPDATE reminders SET archived_at = ?1 WHERE id IN (SELECT id FROM reminders WHERE archived_at IS NULL AND deleted_at IS NULL AND show_at <= ?1 ORDER BY show_at, id LIMIT ?2) RETURNING id, body, show_at, due_at, kind` — これ 1 文だけ。別文としての事前 SELECT は禁止（件数を絞る副問い合わせは同じ 1 文の中）。上限が無いと D1 の応答上限（1MB）超過で 1 文が失敗し続け、1 件もアーカイブできずに恒久的に詰まる |
 | `recordCheck({checkedAt, returnedCount, ok, errorCode, durationMs})` | `INSERT INTO board_checks …`。`takeBoard` と `db.batch()` でまとめない（記録失敗で取得結果を失わないため） |
 | `insert({body, showAt, dueAt, note, kind}, now)` | `showAt` が省略または `now` より前なら `now` を入れる。`created_at = updated_at = now`。挿入した行を返す |
-| `listWaiting(now)` | 待機中を `ORDER BY show_at` |
-| `listActive()` | アクティブ全件を `ORDER BY show_at`（重複確認用） |
-| `listArchived(limit)` | アーカイブ済みを `ORDER BY archived_at DESC LIMIT ?` |
+| `listWaiting(now, limit)` | 待機中を `ORDER BY show_at, id LIMIT ?` |
+| `listActive(limit)` | アクティブを `ORDER BY show_at, id LIMIT ?`（重複確認用）。一覧は必ず `LIMIT` を持たせる |
+| `listArchived(limit)` | アーカイブ済みを `ORDER BY archived_at DESC, show_at DESC, id LIMIT ?` |
 | `update(id, patch, now)` | `UPDATE reminders SET <patch の列>, updated_at = ? WHERE id = ? AND archived_at IS NULL AND deleted_at IS NULL RETURNING *`。patch は body / show_at / due_at（null で消去可）/ note（null で消去可）。`show_at` が `now` より前なら `now` に置き換える。0 行なら `null` を返す |
 | `softDelete(id, now)` | `UPDATE reminders SET deleted_at = ? WHERE id = ? AND archived_at IS NULL AND deleted_at IS NULL RETURNING id`。0 行なら `false` |
 
@@ -219,8 +219,9 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
 **ツール仕様**:
 
 1. `check_board`（入力なし）— 新しい会話の最初の応答前に 1 回だけ呼ばれる
-   - 処理: 受信時刻を `performance.now()`（または `Date.now()`）で記録 → `now = nowJst()` → `repo.takeBoard(now)` → 並べ替え → `repo.recordCheck(...)`（`duration_ms` = 受信から応答オブジェクト完成まで。記録の失敗は `console.error` だけで握りつぶし、応答は返す）
-   - 並び順: 期限の近い順、期限なしは後ろ、同じ期限（または期限なし同士）は `show_at` 昇順
+   - 処理: 受信時刻を `performance.now()`（または `Date.now()`）で記録 → `now = nowJst()` → `repo.takeBoard(now, 50)` → 並べ替え → `repo.recordCheck(...)`（`duration_ms` = 受信から応答オブジェクト完成まで。記録の失敗は `console.error` だけで握りつぶし、応答は返す）
+   - 1 回に取るのは 50 件まで（`BOARD_TAKE_LIMIT`）。超えた分は表示時刻の古い順に残って次の呼び出しで返る（D1 の応答上限 1MB を 1 文で超えると恒久的に詰まるため）。件数が上限に達したときは `has_more: true` を付けて、取り切れていないことを黙って隠さない
+   - 並び順: 期限の近い順、期限なしは後ろ、同じ期限（または期限なし同士）は `show_at` 昇順、それも同じなら `id` 昇順（`UPDATE … RETURNING` の行順は保証されないため）
    - 0 件のとき: 追加の処理をせず、正確に `{"count":0,"items":[]}` を返す（空ボードの経路を最短にする。目標はサーバー処理 100ms 以内）
    - 1 件以上: `{ count, items: [{ id, body, due_at, days_left, show_at, kind, line }] }`。`due_at` と `days_left` は期限なしなら `null`。`line` は表示用の完成済み 1 行:
      - 期限あり・`days_left > 0`: `・[本文]（期限 M/D、あと N 日）`
@@ -229,13 +230,14 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
      - 期限なし: `・[本文]`
      - 会話メモ（note）は返さない
    - D1 が失敗したら `recordCheck` を `ok=0, error_code="DB_ERROR", returned_count=0` で試み（これも失敗したら握りつぶす）、`DB_ERROR` を返す
-2. `add_reminder` — 入力: `body`（1 文字以上、必須）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意）
+2. `add_reminder` — 入力: `body`（1〜200 文字、必須。連続する空白と改行は半角スペース 1 個に畳んで必ず 1 行にする。`line` と `confirmation` にそのまま埋め込むため）、`kind`（`"explicit" | "auto"`、必須）、`show_at`（任意、`+09:00` 付き日時。省略＝即時）、`due_at`（任意、`+09:00` 付き日時または `YYYY-MM-DD`）、`note`（任意、1000 文字以内）
    - `show_at` が省略または過去なら登録時刻にする（リポジトリが行う）
    - 返り値: `{ reminder: { id, body, show_at, due_at, note, kind, created_at }, confirmation }`。`confirmation` は `登録しました：[本文]（表示 M/D HH:MM）`、期限があれば `登録しました：[本文]（表示 M/D HH:MM、期限 M/D）`
-3. `list_reminders` — 入力: `status`（`"waiting" | "active" | "archived"`、必須）、`limit`（任意、archived のみ有効、既定 20、1〜100）
-   - waiting = 表示時刻前の一覧、active = アーカイブされていない全件（重複確認用）、archived = 見返し（`archived_at` 付き、新しい順）
+3. `list_reminders` — 入力: `status`（`"waiting" | "active" | "archived"`、必須）、`limit`（任意、3 ステータスすべてで有効、1〜100。既定は archived が 20、waiting / active が 100）
+   - waiting = 表示時刻前の一覧、active = アーカイブされていない行（重複確認用）、archived = 見返し（`archived_at` 付き、新しい順）
+   - どのステータスも `LIMIT` を持たせる（「一覧は必ず `LIMIT`」の恒久ルール）。`limit + 1` 件取って切り捨てることで、打ち切りがあったときだけ `has_more: true` を付ける（重複確認の一覧が黙って欠けると重複登録に気づけない）
    - 返り値: `{ status, count, items: [{ id, body, show_at, due_at, note, kind, created_at, archived_at }] }`。どの行の状態も変えない
-4. `update_reminder` — 入力: `id`（必須）と、`body` / `show_at` / `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上
+4. `update_reminder` — 入力: `id`（必須）と、`body`（1〜200 文字、`add_reminder` と同じ正規化）/ `show_at` / `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上
    - アーカイブ済み・削除済み・存在しない id は `NOT_FOUND`。更新項目が 1 つも無ければ `VALIDATION_ERROR`
    - 返り値: `{ reminder: {...}, confirmation: "更新しました：[本文]（表示 M/D HH:MM[、期限 M/D]）" }`
 5. `delete_reminder` — 入力: `id`（必須）。アクティブな行だけを論理削除。無ければ `NOT_FOUND`。返り値 `{ deleted: id }`
@@ -246,7 +248,7 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
 - 新しい会話では最初の応答を書く前に `check_board` を 1 回だけ呼ぶ。2 回目以降の応答では呼ばない
 - 1 件以上なら、起動中のスキルや文脈に関係なく、応答の 1 行目から `line` を返された順に全件書く。0 件なら何も書かない。失敗したら 1 行目に「リマインダーを確認できませんでした」
 - 登録を頼まれたら曖昧な時刻を `+09:00` 付きの日時に直して `add_reminder(kind="explicit")`、同じ応答に `confirmation` を 1 行書く
-- 具体的な行動と義務・予定の言い回し（「〜しなきゃ」「〜する予定」「〜の予約がある」）の両方がある発話は、依頼がなくても `list_reminders(status="active")` で重複を確かめてから `add_reminder(kind="auto")` し、応答の最終行に `confirmation` を書く。同じタスクがあれば新しい期限・日時があるときだけ `update_reminder`。日時の無いタスクは登録せず先に確認する
+- 具体的な行動と義務・予定の言い回し（「〜しなきゃ」「〜する予定」「〜の予約がある」）の両方がある発話は、依頼がなくても `list_reminders(status="active")` で重複を確かめてから `add_reminder(kind="auto")` し、応答の最終行に `confirmation` を書く。同じタスクがあれば新しい期限・日時があるときだけ `update_reminder`。日時の無いタスクは登録せず、登録してよいか尋ねて次の発話が肯定のときだけ登録する（README.md と SETUP.md 手順 8 の項目 7 と同じ文言にする）
 
 **Requirements**: REQ-F001〜REQ-F003、REQ-F005、REQ-F006、REQ-F013、REQ-F014、REQ-F015〜REQ-F020、REQ-F023〜REQ-F025、REQ-F027〜REQ-F030、REQ-N001、REQ-N002、REQ-N006。
 

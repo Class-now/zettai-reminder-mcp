@@ -91,12 +91,54 @@ describe("registerReminderTools", () => {
 		expect(Object.keys(configs.get("delete_reminder")?.inputSchema ?? {})).toEqual(["id"]);
 	});
 
+	it("登録したコールバックがツール名どおりの処理につながっている", async () => {
+		const registerTool = vi.fn();
+		registerReminderTools({ registerTool } as unknown as McpServer, { repo, clock: () => NOW_MS });
+		const callbacks = new Map(
+			registerTool.mock.calls.map((call) => [
+				call[0] as string,
+				call[2] as (input: unknown) => Promise<{ content: { text: string }[] }>,
+			]),
+		);
+
+		const added = parse(
+			await callbacks.get("add_reminder")!({ body: "配線の確認", kind: "explicit" }),
+		) as { reminder: { id: string } };
+		expect(added.reminder.id).toBeTypeOf("string");
+
+		expect(parse(await callbacks.get("list_reminders")!({ status: "active" }))).toMatchObject({
+			status: "active",
+			count: 1,
+		});
+
+		expect(
+			parse(await callbacks.get("update_reminder")!({ id: added.reminder.id, body: "直した" })),
+		).toMatchObject({ reminder: { body: "直した" } });
+
+		// update が delete につながっていれば、この時点で行が消えていて NOT_FOUND になる
+		expect(parse(await callbacks.get("delete_reminder")!({ id: added.reminder.id }))).toEqual({
+			deleted: added.reminder.id,
+		});
+
+		expect(parse(await callbacks.get("check_board")!({}))).toEqual({ count: 0, items: [] });
+	});
+
 	it("check_board の説明文が呼ぶタイミングと書き方を伝えている", () => {
 		const description = registeredConfigs().get("check_board")?.description as string;
 		expect(description).toContain("最初の応答");
 		expect(description).toContain("1 回だけ");
 		expect(description).toContain("line");
 		expect(description).toContain("0 件");
+	});
+});
+
+describe("実物の McpServer への登録", () => {
+	it("SDK の registerTool が 5 本の zod スキーマをそのまま受け取れる", async () => {
+		// registerTool のシグネチャや zod の形が SDK 更新で壊れたら、モックでは気づけない
+		const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
+		const server = new McpServer({ name: "test", version: "0.0.0" });
+
+		expect(() => registerReminderTools(server, { repo, clock: () => NOW_MS })).not.toThrow();
 	});
 });
 

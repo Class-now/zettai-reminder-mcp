@@ -59,14 +59,14 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
 	}
 }
 
-export const CHECK_BOARD_DESCRIPTION =
-	"新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。表示時刻を過ぎたリマインダーを 1 回 50 件まで返し、同時にアーカイブする（同じものは二度返らない。超えた分は残り、次の呼び出しで返る）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。";
+const CHECK_BOARD_DESCRIPTION =
+	"新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。表示時刻を過ぎたリマインダーを 1 回 50 件まで返し、同時にアーカイブする（同じものは二度返らない。超えた分は残り、次の呼び出しで返る）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。has_more が true なら最後に「まだ表示していないリマインダーがあります」と 1 行書く。";
 
 const ADD_REMINDER_DESCRIPTION =
 	"リマインダーを登録する。頼まれたときは kind=\"explicit\"、会話から拾って自動登録するときは kind=\"auto\"。show_at を省略すると即時（次の check_board）で表示される。返り値の confirmation を同じ応答に 1 行そのまま書く。";
 
 const LIST_REMINDERS_DESCRIPTION =
-	"リマインダーを一覧する。waiting=表示時刻待ち、active=未取得の全件（重複登録の確認に使う）、archived=取得済みの見返し（新しい順）。行の状態は変わらない。";
+	"リマインダーを一覧する。waiting=表示時刻待ち、active=未取得の全件（重複登録の確認に使う）、archived=取得済みの見返し（新しい順）。行の状態は変わらない。has_more が true なら limit で切れた分があるので、重複の判断に使うときは一覧が全件でないことを前提にする。";
 
 const UPDATE_REMINDER_DESCRIPTION =
 	"既存のリマインダーの本文・表示時刻・期限・会話メモを直す。due_at と note に null を渡すと消去する。取得済み・削除済み・存在しない id は NOT_FOUND になる。";
@@ -77,11 +77,11 @@ const DELETE_REMINDER_DESCRIPTION =
 const JST_HINT = "日本時間の YYYY-MM-DDTHH:MM:SS+09:00 形式";
 
 const addShape = {
-	body: z.string().describe("リマインダーの本文（1 文字以上）"),
+	body: z.string().describe("リマインダーの本文（1〜200 文字。改行は半角スペースに畳まれる）"),
 	kind: z.enum(["explicit", "auto"]).describe("依頼による登録は explicit、自動登録は auto"),
 	show_at: z.string().optional().describe(`表示時刻（${JST_HINT}）。省略すると即時`),
 	due_at: z.string().optional().describe(`期限（${JST_HINT} または YYYY-MM-DD）`),
-	note: z.string().optional().describe("会話メモ。check_board の応答には含まれない"),
+	note: z.string().optional().describe("会話メモ（1000 文字以内）。check_board の応答には含まれない"),
 };
 
 const listShape = {
@@ -97,10 +97,10 @@ const listShape = {
 
 const updateShape = {
 	id: z.string().describe("対象のリマインダー id"),
-	body: z.string().optional().describe("新しい本文"),
+	body: z.string().optional().describe("新しい本文（1〜200 文字）"),
 	show_at: z.string().optional().describe(`新しい表示時刻（${JST_HINT}）`),
 	due_at: z.string().nullable().optional().describe(`新しい期限。null で期限を消す`),
-	note: z.string().nullable().optional().describe("新しい会話メモ。null で消す"),
+	note: z.string().nullable().optional().describe("新しい会話メモ（1000 文字以内）。null で消す"),
 };
 
 const deleteShape = {

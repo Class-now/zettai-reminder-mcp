@@ -108,6 +108,11 @@ export function parseJstDue(input: string): string {
 	const trimmed = input.trim();
 	const match = DATE_PATTERN.exec(trimmed);
 	if (!match) {
+		if (!DATE_TIME_PATTERN.test(trimmed)) {
+			throw new DateTimeError(
+				`期限は YYYY-MM-DD か YYYY-MM-DDTHH:MM+09:00 の形式で指定してください（月日は 2 桁）: ${input}`,
+			);
+		}
 		return parseJstDateTime(trimmed);
 	}
 

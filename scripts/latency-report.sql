@@ -11,6 +11,10 @@
 -- Durable Object の起動・OAuth トークン検証・MCP トランスポート・この board_checks への
 -- INSERT は含まないので、クライアントの体感時間の下限として読む。
 --
+-- さらに Workers では Date.now() が I/O をまたぐまで進まないので、duration_ms は実質
+-- D1 の待ち時間だけを表し、並べ替えや整形の CPU 時間は乗らない。空ボードの avg_ms が
+-- 0 に寄るのはこのため。CPU 時間まで見たいときは Workers Analytics を使う。
+--
 -- 1 文の SELECT（UNION ALL）なので --remote でも --local でもそのまま実行できる。
 SELECT
   'empty' AS bucket,
