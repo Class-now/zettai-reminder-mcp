@@ -35,7 +35,8 @@ vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
 	},
 }));
 
-vi.mock("./auth/github-handler", () => ({ GitHubHandler: {} }));
+const githubHandler = { fetch: vi.fn() };
+vi.mock("./auth/github-handler", () => ({ GitHubHandler: githubHandler }));
 
 const registerReminderTools =
 	vi.fn<(server: unknown, deps: { repo: unknown; clock?: () => number }) => void>();
@@ -78,7 +79,7 @@ describe("worker entry", () => {
 	});
 
 	it("defaultHandler に GitHubHandler を使う", () => {
-		expect(options.defaultHandler).toBeDefined();
+		expect(options.defaultHandler).toBe(githubHandler);
 	});
 
 	it("fetch を OAuthProvider インスタンスの fetch に委譲する", async () => {

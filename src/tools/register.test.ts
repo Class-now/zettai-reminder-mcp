@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ReminderRepo } from "../repo/reminders";
 import { createTestD1, type TestD1Database } from "../test-utils/sqlite-d1";
@@ -16,6 +17,22 @@ beforeEach(() => {
 	repo = new ReminderRepo(db);
 	handlers = createReminderHandlers({ repo, clock: () => NOW_MS });
 });
+
+afterEach(() => {
+	db.close();
+});
+
+/** registerTool に渡された設定をツール名で引く。 */
+function registeredConfigs(): Map<string, { description?: string; inputSchema?: Record<string, z.ZodTypeAny> }> {
+	const registerTool = vi.fn();
+	registerReminderTools({ registerTool } as unknown as McpServer, { repo });
+	return new Map(
+		registerTool.mock.calls.map((call) => [
+			call[0] as string,
+			call[1] as { description?: string; inputSchema?: Record<string, z.ZodTypeAny> },
+		]),
+	);
+}
 
 function parse(result: { content: { text: string }[] }): unknown {
 	return JSON.parse(result.content[0].text);
@@ -75,14 +92,50 @@ describe("registerReminderTools", () => {
 	});
 
 	it("check_board の説明文が呼ぶタイミングと書き方を伝えている", () => {
-		const registerTool = vi.fn();
-		registerReminderTools({ registerTool } as unknown as McpServer, { repo });
-
-		const description = registerTool.mock.calls[0][1].description as string;
+		const description = registeredConfigs().get("check_board")?.description as string;
 		expect(description).toContain("最初の応答");
 		expect(description).toContain("1 回だけ");
 		expect(description).toContain("line");
 		expect(description).toContain("0 件");
+	});
+});
+
+describe("入力スキーマ（zod）", () => {
+	function schemaOf(tool: string): z.ZodObject<Record<string, z.ZodTypeAny>> {
+		const shape = registeredConfigs().get(tool)?.inputSchema;
+		if (shape === undefined) {
+			throw new Error(`${tool} に inputSchema がありません`);
+		}
+		return z.object(shape);
+	}
+
+	it("add_reminder は kind を explicit / auto に限り、body を必須にする", () => {
+		const schema = schemaOf("add_reminder");
+
+		expect(schema.safeParse({ body: "本文", kind: "explicit" }).success).toBe(true);
+		expect(schema.safeParse({ body: "本文", kind: "maybe" }).success).toBe(false);
+		expect(schema.safeParse({ kind: "auto" }).success).toBe(false);
+		expect(schema.safeParse({ body: 1, kind: "auto" }).success).toBe(false);
+	});
+
+	it("list_reminders は status を 3 値に限り、limit を 1〜100 の整数に限る", () => {
+		const schema = schemaOf("list_reminders");
+
+		expect(schema.safeParse({ status: "active" }).success).toBe(true);
+		expect(schema.safeParse({ status: "archived", limit: 1 }).success).toBe(true);
+		expect(schema.safeParse({ status: "archived", limit: 100 }).success).toBe(true);
+		expect(schema.safeParse({ status: "archived", limit: 0 }).success).toBe(false);
+		expect(schema.safeParse({ status: "archived", limit: 101 }).success).toBe(false);
+		expect(schema.safeParse({ status: "archived", limit: 1.5 }).success).toBe(false);
+		expect(schema.safeParse({ status: "done" }).success).toBe(false);
+	});
+
+	it("update_reminder は due_at / note に null を許し、delete_reminder は id を必須にする", () => {
+		expect(
+			schemaOf("update_reminder").safeParse({ id: "x", due_at: null, note: null }).success,
+		).toBe(true);
+		expect(schemaOf("update_reminder").safeParse({ id: 1 }).success).toBe(false);
+		expect(schemaOf("delete_reminder").safeParse({}).success).toBe(false);
 	});
 });
 

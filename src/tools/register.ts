@@ -52,7 +52,7 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
 			return fail(cause.code, cause.message);
 		}
 		if (cause instanceof DateTimeError) {
-			return fail("INVALID_DATETIME", cause.message);
+			return fail(cause.code, cause.message);
 		}
 		console.error("ツールの実行に失敗しました", cause);
 		return fail("DB_ERROR", "データベースの操作に失敗しました");
@@ -86,7 +86,13 @@ const addShape = {
 
 const listShape = {
 	status: z.enum(["waiting", "active", "archived"]).describe("一覧する対象"),
-	limit: z.number().int().min(1).max(100).optional().describe("archived のみ有効。既定 20"),
+	limit: z
+		.number()
+		.int()
+		.min(1)
+		.max(100)
+		.optional()
+		.describe("返す件数の上限（1〜100）。既定は archived が 20、waiting / active が 100"),
 };
 
 const updateShape = {

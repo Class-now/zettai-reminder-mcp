@@ -4,7 +4,7 @@
 
 このファイルには秘密値そのものを書かない。書くのは環境変数名とコマンドだけ。`wrangler secret put` で貼り付けた値や `database_id` などを、このファイルや他のドキュメント・Git に書き戻さないこと。
 
-前提: Node が入っていて `npm install` が済んでいること。Cloudflare アカウントに `npx wrangler login` でログインしていること。
+前提: Node 24 以上が入っていて `npm install` が済んでいること（テストが D1 を `node:sqlite` で代替するため、これより古い Node では `npm test` が動かず `npm run deploy` も通らない）。Cloudflare アカウントに `npx wrangler login` でログインしていること。
 
 ## 1. D1 データベースを作る
 
@@ -90,7 +90,15 @@ claude.ai → 設定 → 個人設定（ユーザー設定の指示）の末尾�
 
 ## 9. 動作を確認する
 
-claude.ai で新しい会話を始める。何か一言話しかけて、応答の前に `check_board` が呼ばれることを確認する（0 件なら応答にリマインダーの行は出ない）。
+まず、Bearer トークン無しの `/mcp` が拒否されることを確認する（REQ-N004）。
+
+```sh
+curl -i https://zettai-reminder-mcp.<subdomain>.workers.dev/mcp
+```
+
+`401` が返ること。返らなければ公開状態なので、先に進まず `wrangler.jsonc` と手順 6 のデプロイを見直す。
+
+次に claude.ai で新しい会話を始める。何か一言話しかけて、応答の前に `check_board` が呼ばれることを確認する（0 件なら応答にリマインダーの行は出ない）。
 
 ```sh
 npm run report:checks
@@ -103,3 +111,5 @@ npm run report:latency
 ```
 
 `bucket = empty` の `over_budget` が 0 のままなら、空ボードの目標（100ms 以内）を満たしている。増えるなら手順 1 の location hint を見直す。
+
+ただし `duration_ms` は `check_board` が応答オブジェクトを組み立て終わるまでの時間で、Durable Object の起動・OAuth トークンの検証・MCP のトランスポート、および `board_checks` への INSERT は含まない。つまりクライアントの体感時間の下限であって、`over_budget = 0` は「サーバー内部の処理が予算内」を意味する。体感が遅いときは 0 のままでも location hint を疑う。

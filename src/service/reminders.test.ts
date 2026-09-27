@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReminderRepo } from "../repo/reminders";
 import { createTestD1, type TestD1Database } from "../test-utils/sqlite-d1";
 import { ReminderService, ServiceError } from "./reminders";
@@ -17,6 +17,10 @@ beforeEach(() => {
 	repo = new ReminderRepo(db);
 	nowMs = NOW_MS;
 	service = new ReminderService(repo, () => nowMs);
+});
+
+afterEach(() => {
+	db.close();
 });
 
 async function countChecks(): Promise<number> {
@@ -131,6 +135,33 @@ describe("checkBoard", () => {
 			ok: 1,
 			error_code: null,
 		});
+	});
+
+	it("duration_ms に経過ミリ秒を記録する", async () => {
+		// clock は checkBoard 内で 2 回読まれる（開始と記録時）。2 回目を 42ms 後にする。
+		let reads = 0;
+		service = new ReminderService(repo, () => {
+			reads += 1;
+			return reads === 1 ? NOW_MS : NOW_MS + 42;
+		});
+
+		await service.checkBoard();
+
+		const check = await latestCheck();
+		expect(check.duration_ms).toBe(42);
+		expect(check.checked_at).toBe(NOW);
+	});
+
+	it("時計が巻き戻っても duration_ms は 0 以上になる", async () => {
+		let reads = 0;
+		service = new ReminderService(repo, () => {
+			reads += 1;
+			return reads === 1 ? NOW_MS : NOW_MS - 5_000;
+		});
+
+		await service.checkBoard();
+
+		expect((await latestCheck()).duration_ms).toBe(0);
 	});
 
 	it("3 回呼ぶと参照記録が 3 行増え、同じリマインダーは 1 回しか返らない", async () => {
@@ -264,6 +295,19 @@ describe("listReminders", () => {
 
 		const board = await service.checkBoard();
 		expect(board.items.map((i) => i.body)).toEqual(["取得できる"]);
+	});
+
+	it("limit は waiting / active でも効く", async () => {
+		expect((await service.listReminders({ status: "active", limit: 1 })).items.map((i) => i.body)).toEqual([
+			"取得できる",
+		]);
+		expect((await service.listReminders({ status: "active" })).count).toBe(2);
+		expect((await service.listReminders({ status: "waiting", limit: 1 })).count).toBe(1);
+	});
+
+	it("limit の境界（1 と 100）は通る", async () => {
+		expect((await service.listReminders({ status: "archived", limit: 1 })).count).toBe(0);
+		expect((await service.listReminders({ status: "archived", limit: 100 })).count).toBe(0);
 	});
 
 	it("archived の limit は範囲外なら VALIDATION_ERROR", async () => {

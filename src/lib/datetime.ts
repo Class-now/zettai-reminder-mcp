@@ -25,9 +25,22 @@ function pad2(value: number): string {
 	return String(value).padStart(2, "0");
 }
 
+/** 年は必ず 4 桁にする（`Date.UTC` は 0〜99 年を 1900 年代に読み替えるので使わない）。 */
+function pad4(value: number): string {
+	return String(value).padStart(4, "0");
+}
+
+/** 月日だけの UTC 時刻。`Date.UTC` の 2 桁年の読み替えを避けるため `setUTCFullYear` を使う。 */
+function utcOf(year: number, month: number, day: number): Date {
+	const utc = new Date(0);
+	utc.setUTCFullYear(year, month - 1, day);
+	utc.setUTCHours(0, 0, 0, 0);
+	return utc;
+}
+
 /** 実在する暦日かどうか（2026-02-30 のような繰り上がりを弾く）。 */
 function isRealDate(year: number, month: number, day: number): boolean {
-	const utc = new Date(Date.UTC(year, month - 1, day));
+	const utc = utcOf(year, month, day);
 	return (
 		utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day
 	);
@@ -41,7 +54,7 @@ function build(
 	minute: number,
 	second: number,
 ): string {
-	return `${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}${JST_SUFFIX}`;
+	return `${pad4(year)}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}${JST_SUFFIX}`;
 }
 
 /** 現在時刻（省略時 `Date.now()`）を保存形式で返す。ミリ秒は切り捨て。 */
@@ -114,7 +127,7 @@ function calendarDayIndex(dt: string): number {
 	if (!match) {
 		throw new DateTimeError(`日時の形式が不正です: ${dt}`);
 	}
-	const utc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+	const utc = utcOf(Number(match[1]), Number(match[2]), Number(match[3])).getTime();
 	return Math.round(utc / 86_400_000);
 }
 

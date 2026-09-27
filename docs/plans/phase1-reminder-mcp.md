@@ -10,6 +10,8 @@
 
 この Phase ではリモート環境（D1/KV の作成、secret 設定、デプロイ）には一切触れない。`wrangler.jsonc` の ID はプレースホルダのままでよい。
 
+**Status**: Phase 1 完了（全 5 タスク、2026-09-27）。`npm run typecheck` / `npm test` / `npx wrangler deploy --dry-run` が通る状態。次は Phase 2（`docs/process.md` の TASK-P2-001〜005、PM が直接実行）。手順は SETUP.md。
+
 ## Validation Commands
 
 - `npm run typecheck`

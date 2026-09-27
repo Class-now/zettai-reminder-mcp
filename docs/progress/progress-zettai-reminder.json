@@ -2,28 +2,86 @@
   "schema_version": "1.0",
   "project": "絶対伝えろよリマインダー",
   "source_document": "docs/process.md（PM補完版）",
-  "last_updated": "2026-09-27T15:30:00+09:00",
-  "session_count": 1,
-  "notion_pages": { "technical_design": null, "process_document": null },
-  "current_phase": "Phase 1",
-  "current_task": "TASK-P1-001",
-  "summary": "Phase 1 のralphexプランを生成し実行開始。",
+  "last_updated": "2026-09-27T23:59:00+09:00",
+  "session_count": 2,
+  "notion_pages": {
+    "technical_design": null,
+    "process_document": null
+  },
+  "current_phase": "Phase 2",
+  "current_task": "TASK-P2-001",
+  "summary": "Phase 1（MCP サーバー本体）を全 5 タスク完了。次は Phase 2 のリモート環境構築（D1/KV 作成・secret 設定・デプロイ）。",
   "phases": {
-    "Phase 1": { "status": "in_progress", "tasks": {
-      "TASK-P1-001": {"status":"in_progress","ralphex_plan":"phase1-reminder-mcp.md"},
-      "TASK-P1-002": {"status":"not_started","ralphex_plan":"phase1-reminder-mcp.md"},
-      "TASK-P1-003": {"status":"not_started","ralphex_plan":"phase1-reminder-mcp.md"},
-      "TASK-P1-004": {"status":"not_started","ralphex_plan":"phase1-reminder-mcp.md"},
-      "TASK-P1-005": {"status":"not_started","ralphex_plan":"phase1-reminder-mcp.md"}
-    }},
-    "Phase 2": { "status": "not_started", "tasks": {} },
-    "Phase 3": { "status": "not_started", "tasks": {} }
+    "Phase 1": {
+      "status": "completed",
+      "tasks": {
+        "TASK-P1-001": {
+          "status": "completed",
+          "ralphex_plan": "phase1-reminder-mcp.md"
+        },
+        "TASK-P1-002": {
+          "status": "completed",
+          "ralphex_plan": "phase1-reminder-mcp.md"
+        },
+        "TASK-P1-003": {
+          "status": "completed",
+          "ralphex_plan": "phase1-reminder-mcp.md"
+        },
+        "TASK-P1-004": {
+          "status": "completed",
+          "ralphex_plan": "phase1-reminder-mcp.md"
+        },
+        "TASK-P1-005": {
+          "status": "completed",
+          "ralphex_plan": "phase1-reminder-mcp.md"
+        }
+      }
+    },
+    "Phase 2": {
+      "status": "not_started",
+      "tasks": {}
+    },
+    "Phase 3": {
+      "status": "not_started",
+      "tasks": {}
+    }
   },
   "blockers": [],
   "upstream_feedback": [
-    {"id":"DFB-001","type":"DFB","destination":"技術設計","description":"5〜11章未記入。Phase1 Task4 仕様を正として反映","related_task":"TASK-P1-004","urgency":"中","status":"pending"},
-    {"id":"DFB-002","type":"DFB","destination":"技術設計","description":"TEC-006 流用元はMcpAgent(DO経由)。REQ-N001影響をSPIKE-001で測定","related_task":"TASK-P2-005","urgency":"中","status":"pending"},
-    {"id":"DFB-003","type":"DFB","destination":"技術設計","description":"上流IdPはGitHub OAuth(ALLOWED_GITHUB_USER_ID)。4.3に明記","related_task":"TASK-P2-002","urgency":"低","status":"pending"}
+    {
+      "id": "DFB-001",
+      "type": "DFB",
+      "destination": "技術設計",
+      "description": "5〜11章未記入。Phase1 Task4 仕様を正として反映",
+      "related_task": "TASK-P1-004",
+      "urgency": "中",
+      "status": "resolved",
+      "resolution": "Phase 1 Task 4 で 5 ツールの仕様を実装済み。README.md のツール表を正とする"
+    },
+    {
+      "id": "DFB-002",
+      "type": "DFB",
+      "destination": "技術設計",
+      "description": "TEC-006 流用元はMcpAgent(DO経由)。REQ-N001影響をSPIKE-001で測定",
+      "related_task": "TASK-P2-005",
+      "urgency": "中",
+      "status": "pending"
+    },
+    {
+      "id": "DFB-003",
+      "type": "DFB",
+      "destination": "技術設計",
+      "description": "上流IdPはGitHub OAuth(ALLOWED_GITHUB_USER_ID)。4.3に明記",
+      "related_task": "TASK-P2-002",
+      "urgency": "低",
+      "status": "pending"
+    }
   ],
-  "session_log": []
+  "session_log": [
+    {
+      "date": "2026-09-27",
+      "phase": "Phase 1",
+      "note": "TASK-P1-001〜005 完了。Worker/OAuth/McpAgent 骨格、JST 固定 datetime、D1 スキーマとリポジトリ、MCP 5 ツールとサーバー指示文、運用ドキュメントと処理時間集計スクリプト。typecheck / test（104 件）/ dry-run 通過。コードレビューの指摘を反映済み。"
+    }
+  ]
 }

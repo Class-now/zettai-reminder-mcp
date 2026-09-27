@@ -7,6 +7,10 @@
 --   budget_ms   目標値。空ボード 100ms / 非空 500ms
 --   over_budget budget_ms を超えた回数
 --
+-- duration_ms は check_board が応答オブジェクトを組み立て終わるまでの時間（プランの定義）。
+-- Durable Object の起動・OAuth トークン検証・MCP トランスポート・この board_checks への
+-- INSERT は含まないので、クライアントの体感時間の下限として読む。
+--
 -- 1 文の SELECT（UNION ALL）なので --remote でも --local でもそのまま実行できる。
 SELECT
   'empty' AS bucket,

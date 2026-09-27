@@ -136,39 +136,47 @@ export class ReminderRepo {
 			)
 			.bind(id, input.body, showAt, input.dueAt ?? null, input.note ?? null, input.kind, now, now)
 			.all<ReminderRow>();
-		return toReminder(results[0]);
+		const row = results[0];
+		if (row === undefined) {
+			throw new Error("INSERT … RETURNING が行を返しませんでした");
+		}
+		return toReminder(row);
 	}
 
 	/** 待機中（表示時刻がまだ来ていない）を表示時刻順。 */
-	async listWaiting(now: string): Promise<Reminder[]> {
+	async listWaiting(now: string, limit: number): Promise<Reminder[]> {
 		const { results } = await this.db
 			.prepare(
 				`SELECT id, body, show_at, due_at, note, kind, created_at, updated_at, archived_at
-				 FROM reminders WHERE ${ACTIVE} AND show_at > ? ORDER BY show_at`,
+				 FROM reminders WHERE ${ACTIVE} AND show_at > ? ORDER BY show_at, id LIMIT ?`,
 			)
-			.bind(now)
+			.bind(now, limit)
 			.all<ReminderRow>();
 		return results.map(toReminder);
 	}
 
-	/** アクティブ全件を表示時刻順（重複登録の確認用）。 */
-	async listActive(): Promise<Reminder[]> {
+	/** アクティブを表示時刻順（重複登録の確認用）。 */
+	async listActive(limit: number): Promise<Reminder[]> {
 		const { results } = await this.db
 			.prepare(
 				`SELECT id, body, show_at, due_at, note, kind, created_at, updated_at, archived_at
-				 FROM reminders WHERE ${ACTIVE} ORDER BY show_at`,
+				 FROM reminders WHERE ${ACTIVE} ORDER BY show_at, id LIMIT ?`,
 			)
+			.bind(limit)
 			.all<ReminderRow>();
 		return results.map(toReminder);
 	}
 
-	/** アーカイブ済みを取得日時の新しい順。 */
+	/**
+	 * アーカイブ済みを取得日時の新しい順。1 回の `takeBoard` で取った行は
+	 * `archived_at` が同値になるので、`show_at` と `id` まで見て順序を一意にする。
+	 */
 	async listArchived(limit: number): Promise<Reminder[]> {
 		const { results } = await this.db
 			.prepare(
 				`SELECT id, body, show_at, due_at, note, kind, created_at, updated_at, archived_at
 				 FROM reminders WHERE archived_at IS NOT NULL AND deleted_at IS NULL
-				 ORDER BY archived_at DESC LIMIT ?`,
+				 ORDER BY archived_at DESC, show_at DESC, id LIMIT ?`,
 			)
 			.bind(limit)
 			.all<ReminderRow>();
@@ -213,10 +221,13 @@ export class ReminderRepo {
 		return results.length === 0 ? null : toReminder(results[0]);
 	}
 
-	/** 論理削除。対象が無ければ `false`。 */
+	/** 論理削除。`updated_at` も進める。対象が無ければ `false`。 */
 	async softDelete(id: string, now: string): Promise<boolean> {
 		const { results } = await this.db
-			.prepare(`UPDATE reminders SET deleted_at = ? WHERE id = ? AND ${ACTIVE} RETURNING id`)
+			.prepare(
+				`UPDATE reminders SET deleted_at = ?1, updated_at = ?1
+				 WHERE id = ?2 AND ${ACTIVE} RETURNING id`,
+			)
 			.bind(now, id)
 			.all<{ id: string }>();
 		return results.length > 0;

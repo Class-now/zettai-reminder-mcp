@@ -1,0 +1,10 @@
+{
+	/* Worker 本体だけを Workers の型で型チェックする（node の型を混ぜない）。
+	   テストと運用スクリプトは tsconfig.json 側で node の型込みでチェックする。 */
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["./worker-configuration.d.ts"]
+	},
+	"include": ["src/**/*.ts", "worker-env.d.ts"],
+	"exclude": ["src/**/*.test.ts", "src/test-utils"]
+}

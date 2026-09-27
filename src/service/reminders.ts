@@ -110,7 +110,9 @@ export interface DeleteReminderResult {
 }
 
 const DEFAULT_ARCHIVED_LIMIT = 20;
-const MAX_ARCHIVED_LIMIT = 100;
+/** waiting / active は「重複確認」用なので既定でも上限まで返す。 */
+const DEFAULT_LIST_LIMIT = 100;
+const MAX_LIST_LIMIT = 100;
 
 function reminderPayload(reminder: Reminder): ReminderPayload {
 	return {
@@ -129,12 +131,11 @@ function listPayload(reminder: Reminder): ListReminderPayload {
 }
 
 /** 表示用の完成済み 1 行。会話メモ（note）は入れない。 */
-function boardLine(body: string, dueAt: string | null, now: string): string {
-	if (dueAt === null) {
+function boardLine(body: string, dueAt: string | null, daysLeft: number | null): string {
+	if (dueAt === null || daysLeft === null) {
 		return `・${body}`;
 	}
 	const monthDay = formatMonthDay(dueAt);
-	const daysLeft = daysUntil(dueAt, now);
 	if (daysLeft > 0) {
 		return `・${body}（期限 ${monthDay}、あと ${daysLeft} 日）`;
 	}
@@ -208,6 +209,7 @@ export class ReminderService {
 		try {
 			taken = await this.repo.takeBoard(now);
 		} catch (cause) {
+			console.error("takeBoard に失敗しました", cause);
 			await this.safeRecord({
 				checkedAt: now,
 				returnedCount: 0,
@@ -218,21 +220,19 @@ export class ReminderService {
 			throw new ServiceError("DB_ERROR", "リマインダーを取得できませんでした");
 		}
 
-		const result: CheckBoardResult =
-			taken.length === 0
-				? { count: 0, items: [] }
-				: {
-						count: taken.length,
-						items: [...taken].sort(compareBoardItems).map((item) => ({
-							id: item.id,
-							body: item.body,
-							due_at: item.dueAt,
-							days_left: item.dueAt === null ? null : daysUntil(item.dueAt, now),
-							show_at: item.showAt,
-							kind: item.kind,
-							line: boardLine(item.body, item.dueAt, now),
-						})),
-					};
+		const items = taken.sort(compareBoardItems).map((item) => {
+			const daysLeft = item.dueAt === null ? null : daysUntil(item.dueAt, now);
+			return {
+				id: item.id,
+				body: item.body,
+				due_at: item.dueAt,
+				days_left: daysLeft,
+				show_at: item.showAt,
+				kind: item.kind,
+				line: boardLine(item.body, item.dueAt, daysLeft),
+			};
+		});
+		const result: CheckBoardResult = { count: items.length, items };
 
 		await this.safeRecord({
 			checkedAt: now,
@@ -276,13 +276,15 @@ export class ReminderService {
 		let reminders: Reminder[];
 		switch (input.status) {
 			case "waiting":
-				reminders = await this.repo.listWaiting(now);
+				reminders = await this.repo.listWaiting(now, this.listLimit(input.limit, DEFAULT_LIST_LIMIT));
 				break;
 			case "active":
-				reminders = await this.repo.listActive();
+				reminders = await this.repo.listActive(this.listLimit(input.limit, DEFAULT_LIST_LIMIT));
 				break;
 			case "archived":
-				reminders = await this.repo.listArchived(this.archivedLimit(input.limit));
+				reminders = await this.repo.listArchived(
+					this.listLimit(input.limit, DEFAULT_ARCHIVED_LIMIT),
+				);
 				break;
 			default:
 				throw new ServiceError(
@@ -337,12 +339,12 @@ export class ReminderService {
 		return { deleted: id };
 	}
 
-	private archivedLimit(limit: number | undefined): number {
+	private listLimit(limit: number | undefined, fallback: number): number {
 		if (limit === undefined) {
-			return DEFAULT_ARCHIVED_LIMIT;
+			return fallback;
 		}
-		if (!Number.isInteger(limit) || limit < 1 || limit > MAX_ARCHIVED_LIMIT) {
-			throw new ServiceError("VALIDATION_ERROR", `limit は 1〜${MAX_ARCHIVED_LIMIT} の整数です`);
+		if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
+			throw new ServiceError("VALIDATION_ERROR", `limit は 1〜${MAX_LIST_LIMIT} の整数です`);
 		}
 		return limit;
 	}

@@ -1,6 +1,6 @@
 /**
  * テスト専用の D1 代替。Node 内蔵の `node:sqlite` の上に、`ReminderRepo` が使う
- * 範囲の `D1Database`（`prepare().bind().first()/all()/run()` と `exec()`）を実装する。
+ * 範囲の `D1Database`（`prepare().bind().first()/all()/run()`）だけを実装する。
  *
  * Worker のバンドルには入れない（`src/index.ts` から到達しない）。
  */
@@ -83,11 +83,6 @@ class TestD1 {
 
 	prepare(sql: string): TestPreparedStatement {
 		return new TestPreparedStatement(this.db, sql);
-	}
-
-	async exec(sql: string): Promise<{ count: number; duration: number }> {
-		this.db.exec(sql);
-		return { count: 0, duration: 0 };
 	}
 
 	close(): void {

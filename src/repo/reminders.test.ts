@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestD1, type TestD1Database } from "../test-utils/sqlite-d1";
 import { ReminderRepo } from "./reminders";
 
@@ -10,6 +10,10 @@ let repo: ReminderRepo;
 beforeEach(() => {
 	db = createTestD1();
 	repo = new ReminderRepo(db);
+});
+
+afterEach(() => {
+	db.close();
 });
 
 /** 直接 SQL を投げてテスト用の行を作る（リポジトリの API では作れない状態のため）。 */
@@ -52,7 +56,7 @@ describe("takeBoard", () => {
 		const taken = await repo.takeBoard(NOW);
 
 		expect(taken.map((item) => item.id)).toEqual(["due-now"]);
-		expect((await repo.listWaiting(NOW)).map((r) => r.id)).toEqual(["one-minute-later"]);
+		expect((await repo.listWaiting(NOW, 100)).map((r) => r.id)).toEqual(["one-minute-later"]);
 	});
 
 	it("表示に必要な列を camelCase で返す", async () => {
@@ -138,8 +142,17 @@ describe("listWaiting / listActive", () => {
 			archivedAt: NOW,
 		});
 
-		expect((await repo.listWaiting(NOW)).map((r) => r.id)).toEqual(["sooner", "later"]);
-		expect((await repo.listActive()).map((r) => r.id)).toEqual(["past", "sooner", "later"]);
+		expect((await repo.listWaiting(NOW, 100)).map((r) => r.id)).toEqual(["sooner", "later"]);
+		expect((await repo.listActive(100)).map((r) => r.id)).toEqual(["past", "sooner", "later"]);
+	});
+
+	it("listWaiting / listActive も limit を守る", async () => {
+		await seed({ id: "past", body: "表示済み", showAt: "2026-10-01T09:00:00+09:00" });
+		await seed({ id: "sooner", body: "近い", showAt: "2026-10-04T09:00:00+09:00" });
+		await seed({ id: "later", body: "遠い", showAt: "2026-10-05T09:00:00+09:00" });
+
+		expect((await repo.listWaiting(NOW, 1)).map((r) => r.id)).toEqual(["sooner"]);
+		expect((await repo.listActive(2)).map((r) => r.id)).toEqual(["past", "sooner"]);
 	});
 });
 
@@ -185,13 +198,19 @@ describe("update / softDelete", () => {
 		expect(future?.showAt).toBe("2026-10-09T07:00:00+09:00");
 	});
 
-	it("softDelete した行はどの一覧にも出ない", async () => {
+	it("softDelete した行はどの一覧にも出ず、updated_at が進む", async () => {
 		const created = await repo.insert({ body: "本文", kind: "explicit" }, NOW);
+		const later = "2026-10-03T09:00:00+09:00";
 
-		expect(await repo.softDelete(created.id, NOW)).toBe(true);
+		expect(await repo.softDelete(created.id, later)).toBe(true);
+		const row = await db
+			.prepare("SELECT updated_at, deleted_at FROM reminders WHERE id = ?")
+			.bind(created.id)
+			.first<{ updated_at: string; deleted_at: string }>();
+		expect(row).toEqual({ updated_at: later, deleted_at: later });
 		expect(await repo.softDelete(created.id, NOW)).toBe(false);
 		expect(await repo.takeBoard(NOW)).toEqual([]);
-		expect(await repo.listActive()).toEqual([]);
+		expect(await repo.listActive(100)).toEqual([]);
 	});
 });
 
@@ -239,6 +258,16 @@ describe("listArchived", () => {
 
 		expect((await repo.listArchived(10)).map((r) => r.id)).toEqual(["new", "mid", "old"]);
 		expect((await repo.listArchived(2)).map((r) => r.id)).toEqual(["new", "mid"]);
+	});
+
+	it("1 回の takeBoard で取った行（archived_at が同値）も順序が一意になる", async () => {
+		await seed({ id: "b", body: "後に表示", showAt: "2026-10-03T07:00:00+09:00" });
+		await seed({ id: "a", body: "先に表示", showAt: "2026-10-03T06:00:00+09:00" });
+		await repo.takeBoard(NOW);
+
+		const ids = (await repo.listArchived(10)).map((r) => r.id);
+		expect(ids).toEqual(["b", "a"]);
+		expect((await repo.listArchived(1)).map((r) => r.id)).toEqual(["b"]);
 	});
 });
 
