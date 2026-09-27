@@ -6,7 +6,7 @@
 - データ: Cloudflare D1（binding `DB`）。OAuth トークンだけ Workers KV（binding `OAUTH_KV`）
 - 認証: `@cloudflare/workers-oauth-provider`（Worker 自身が OAuth 2.1 認可サーバー、動的クライアント登録＋PKCE S256）。上流 IdP は GitHub OAuth。`ALLOWED_GITHUB_USER_ID` と一致する GitHub ユーザーだけ通す。`src/auth/` に流用元のファイルがコミット済み
 - MCP: `agents/mcp` の `McpAgent`（Durable Object binding `MCP_OBJECT`）＋ `@modelcontextprotocol/sdk` の `McpServer`。Streamable HTTP の窓口は `/mcp`
-- テスト: Vitest（node 環境）。D1 は `node:sqlite`（Node 26 に内蔵）で作るテスト用アダプタで代替する
+- テスト: Vitest（node 環境）。D1 は `node:sqlite`（Node 24 以上で無フラグで使える）で作るテスト用アダプタで代替する
 
 この Phase ではリモート環境（D1/KV の作成、secret 設定、デプロイ）には一切触れない。`wrangler.jsonc` の ID はプレースホルダのままでよい。
 
@@ -28,8 +28,9 @@
 
 1. `package.json`（name `zettai-reminder-mcp`、private、`"type": "module"`）
    - dependencies（バージョン固定の目安。流用元で動作実績あり）: `@cloudflare/workers-oauth-provider` ^0.2.3、`agents` ^0.5.0、`@modelcontextprotocol/sdk` ^1.26.0、`hono` ^4.12.0、`octokit` ^5.0.5、`zod` ^4.3.6
-   - devDependencies: `@cloudflare/workers-types` ^4.20260227.0、`typescript` 5.9.3、`vitest` ^4.1.9、`wrangler` ^4.67.0、`@types/node`（最新）
-   - scripts: `"dev": "wrangler dev"`、`"test": "vitest run"`、`"typecheck": "tsc --noEmit"`、`"cf-typegen": "wrangler types"`、`"deploy": "npm run typecheck && npm test && wrangler deploy"`、`"db:migrate:local": "wrangler d1 migrations apply zettai-reminder --local"`、`"db:migrate:remote": "wrangler d1 migrations apply zettai-reminder --remote"`
+   - devDependencies: `typescript` 5.9.3、`vitest` ^4.1.9、`wrangler` ^4.67.0、`@types/node`（最新）。`@cloudflare/workers-types` は入れない（Workers の型は `wrangler types` が出す `worker-configuration.d.ts` を使う）
+   - `engines.node` は `>=24`（`node:sqlite` が無フラグで使える版）
+   - scripts: `"dev": "wrangler dev"`、`"test": "vitest run"`、`"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json"`（2 本目は Worker 本体だけを Workers の型でチェックする）、`"cf-typegen": "wrangler types"`、`"deploy": "npm run typecheck && npm test && wrangler deploy"`、`"db:migrate:local": "wrangler d1 migrations apply zettai-reminder --local"`、`"db:migrate:remote": "wrangler d1 migrations apply zettai-reminder --remote"`
    - `npm install` を実行し `package-lock.json` をコミットする
 2. `wrangler.jsonc`
    ```jsonc
@@ -60,7 +61,7 @@
      }
    }
    ```
-   `npm run cf-typegen` で `worker-configuration.d.ts` を生成してコミットする。`tsconfig.json` は流用元のまま使い、`"exclude": ["node_modules", ".wrangler"]` に直し、テストファイル（`src/**/*.test.ts`）も型検査に含まれることを確認する。vitest のグローバルは import で使う（`import { describe, it, expect } from "vitest"`）。
+   `npm run cf-typegen` で `worker-configuration.d.ts` を生成してコミットする。`tsconfig.json` は流用元をほぼそのまま使い、`"types"` を `["./worker-configuration.d.ts", "node"]`、`"exclude"` を `["node_modules", ".wrangler"]` に直して、テストファイル（`src/**/*.test.ts`）と運用スクリプトも型検査に含まれることを確認する。さらに `tsconfig.worker.json`（`tsconfig.json` を継承し、`"types": ["./worker-configuration.d.ts"]`、`include` は `src/**/*.ts` と `worker-env.d.ts`、`exclude` は `src/**/*.test.ts` と `src/test-utils`）を置き、Worker 本体に node の型が混ざらないことを別パスで確かめる。vitest のグローバルは import で使う（`import { describe, it, expect } from "vitest"`）。
 4. `src/types.ts`: `export type Env = Cloudflare.Env;`
 5. `src/auth/github-handler.ts` の承認画面の表示文言だけを変える: `name: "絶対伝えろよリマインダー"`、`description: "リマインダーサーバーへの接続を承認する（GitHub アカウントで認証）。"`。それ以外のロジック（CSRF、state、`ALLOWED_GITHUB_USER_ID` の照合）は一切変えない。`src/auth/utils.ts` の `Props` 型もそのまま使う。
 6. `src/index.ts`（流用元の構成。下の形に揃える）
