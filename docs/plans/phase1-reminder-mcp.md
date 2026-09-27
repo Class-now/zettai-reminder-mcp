@@ -94,12 +94,12 @@
 
 **Requirements**: REQ-N004（認証されていないリクエストを 100% 拒否。OAuthProvider が `/mcp` への Bearer トークン無し・無効リクエストを 401 にする）、CON-002、CON-005。
 
-- [ ] `npm install` が成功し `package.json` と `package-lock.json` がコミットされている
-- [ ] `wrangler.jsonc` に `DB`（D1）・`OAUTH_KV`（KV）・`MCP_OBJECT`（DO、class `ReminderMCP`）の 3 binding と `ALLOWED_GITHUB_USER_ID` がある
-- [ ] `src/index.ts` が OAuthProvider に `/mcp` を `ReminderMCP.serve("/mcp")` で登録し、`/authorize` `/register` `/token` を持つ
-- [ ] `src/auth/` の変更は承認画面の `name` と `description` の文字列だけである（`git diff` で確認）
-- [ ] `npm run typecheck` と `npm test` が通る
-- [ ] `npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が成功する
+- [x] `npm install` が成功し `package.json` と `package-lock.json` がコミットされている
+- [x] `wrangler.jsonc` に `DB`（D1）・`OAUTH_KV`（KV）・`MCP_OBJECT`（DO、class `ReminderMCP`）の 3 binding と `ALLOWED_GITHUB_USER_ID` がある
+- [x] `src/index.ts` が OAuthProvider に `/mcp` を `ReminderMCP.serve("/mcp")` で登録し、`/authorize` `/register` `/token` を持つ
+- [x] `src/auth/` の変更は承認画面の `name` と `description` の文字列だけである（`git diff` で確認）
+- [x] `npm run typecheck` と `npm test` が通る
+- [x] `npx wrangler deploy --dry-run --outdir .wrangler/dry-run` が成功する
 
 Do NOT implement: リマインダーのツール・D1 のスキーマ（Task 2〜4）、scheduled ハンドラや cron、専用 GUI、リモート環境への操作（`wrangler d1 create`・`wrangler kv namespace create`・`wrangler secret put`・`wrangler deploy` 本番実行）。
 

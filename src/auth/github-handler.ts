@@ -39,9 +39,9 @@ app.get("/authorize", async (c) => {
 		client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
 		csrfToken,
 		server: {
-			description: "個人プロフィール RAG への接続を承認する（GitHub アカウントで認証）。",
+			description: "リマインダーサーバーへの接続を承認する（GitHub アカウントで認証）。",
 			logo: "https://avatars.githubusercontent.com/u/314135?s=200&v=4",
-			name: "Personal RAG MCP Server",
+			name: "絶対伝えろよリマインダー",
 		},
 		setCookie,
 		state: { oauthReqInfo },
