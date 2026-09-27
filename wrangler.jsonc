@@ -1,0 +1,24 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "zettai-reminder-mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-03-10",
+	"compatibility_flags": ["nodejs_compat"],
+	// secrets（値はここに書かない）: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, COOKIE_ENCRYPTION_KEY
+	"migrations": [{ "new_sqlite_classes": ["ReminderMCP"], "tag": "v1" }],
+	"durable_objects": { "bindings": [{ "class_name": "ReminderMCP", "name": "MCP_OBJECT" }] },
+	// id はプレースホルダ。Phase 2 で PM が `wrangler kv namespace create` の実 ID に置き換える
+	"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+	// database_id はプレースホルダ。Phase 2 で PM が `wrangler d1 create zettai-reminder` の実 ID に置き換える
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "zettai-reminder",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"vars": { "ALLOWED_GITHUB_USER_ID": "255099949" },
+	"observability": { "enabled": true },
+	"dev": { "port": 8789 }
+}

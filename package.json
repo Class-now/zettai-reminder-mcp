@@ -1,0 +1,38 @@
+{
+	"name": "zettai-reminder-mcp",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "wrangler dev",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+		"cf-typegen": "wrangler types",
+		"deploy": "npm run typecheck && npm test && wrangler deploy",
+		"db:migrate:local": "wrangler d1 migrations apply zettai-reminder --local",
+		"db:migrate:remote": "wrangler d1 migrations apply zettai-reminder --remote",
+		"report:checks": "wrangler d1 execute zettai-reminder --remote --command \"SELECT checked_at, returned_count, ok, error_code, duration_ms FROM board_checks ORDER BY id DESC LIMIT 50\"",
+		"report:latency": "wrangler d1 execute zettai-reminder --remote --file scripts/latency-report.sql"
+	},
+	"dependencies": {
+		"@cloudflare/workers-oauth-provider": "^0.2.3",
+		"@modelcontextprotocol/sdk": "1.26.0",
+		"agents": "^0.5.0",
+		"hono": "^4.12.0",
+		"octokit": "^5.0.5",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"typescript": "5.9.3",
+		"vitest": "^4.1.9",
+		"wrangler": "^4.67.0"
+	},
+	"allowScripts": {
+		"esbuild@0.28.1": true,
+		"workerd@1.20260925.1": true
+	}
+}
