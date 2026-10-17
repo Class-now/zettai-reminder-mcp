@@ -17,6 +17,7 @@ import {
 import type {
 	BoardCheckRecord,
 	BoardItem,
+	CallerInfo,
 	Reminder,
 	ReminderKind,
 	ReminderRepo,
@@ -82,7 +83,21 @@ export interface CheckBoardResult {
 	count: number;
 	/** 上限に達して取り切れなかったときだけ `true` が付く（0 件の応答の形は変えない）。 */
 	has_more?: true;
+	/** claude.ai のチャット以外からの呼び出しで、ボードに触らなかったときだけ `true` が付く。 */
+	skipped?: true;
 	items: BoardResponseItem[];
+}
+
+/**
+ * claude.ai のチャットではないと分かっているクライアント（`x-anthropic-client` の値）。
+ * claude.ai のコネクタは Claude Code・クラウドセッションにも同じ MCP として届くため、
+ * そこで check_board を呼ばれるとボードが本人の目に触れないまま消費される。
+ */
+const NON_CHAT_CLIENTS: ReadonlySet<string> = new Set(["ClaudeCode"]);
+
+/** チャットの新しい会話に向けた呼び出しか。分からないものはチャット扱い（伝え漏れより重複を採る）。 */
+export function isChatCaller(caller?: CallerInfo): boolean {
+	return !(caller?.client && NON_CHAT_CLIENTS.has(caller.client));
 }
 
 export interface ReminderPayload {
@@ -267,9 +282,21 @@ export class ReminderService {
 	 * `has_more: true` を付けて黙って隠さない（ちょうど上限で尽きた場合も `true` になるが、
 	 * 残りを見落とすより過剰に知らせる方を採る）。参照記録の失敗は握りつぶす。
 	 */
-	async checkBoard(): Promise<CheckBoardResult> {
+	async checkBoard(caller?: CallerInfo): Promise<CheckBoardResult> {
 		const startedMs = this.clock();
 		const now = nowJst(startedMs);
+
+		if (!isChatCaller(caller)) {
+			await this.safeRecord({
+				checkedAt: now,
+				returnedCount: 0,
+				ok: true,
+				errorCode: null,
+				durationMs: this.elapsedMs(startedMs),
+				caller,
+			});
+			return { count: 0, skipped: true, items: [] };
+		}
 
 		let taken: BoardItem[];
 		try {
@@ -282,6 +309,7 @@ export class ReminderService {
 				ok: false,
 				errorCode: "DB_ERROR",
 				durationMs: this.elapsedMs(startedMs),
+				caller,
 			});
 			throw new ServiceError("DB_ERROR", "リマインダーを取得できませんでした");
 		}
@@ -309,6 +337,7 @@ export class ReminderService {
 			ok: true,
 			errorCode: null,
 			durationMs: this.elapsedMs(startedMs),
+			caller,
 		});
 
 		return result;

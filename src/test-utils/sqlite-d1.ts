@@ -5,12 +5,12 @@
  * Worker のバンドルには入れない（`src/index.ts` から到達しない）。
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 // workers-types の URL と node の URL が衝突するため、文字列にしてから渡す
-const MIGRATION_PATH = fileURLToPath(new URL("../../migrations/0001_init.sql", import.meta.url).href);
+const MIGRATIONS_DIR = fileURLToPath(new URL("../../migrations/", import.meta.url).href);
 
 /** D1 の `meta` は使っていないので、形だけ揃えた最小の値を返す。 */
 function meta(changes = 0, lastRowId = 0) {
@@ -92,9 +92,11 @@ class TestD1 {
 
 export type TestD1Database = D1Database & { close(): void };
 
-/** `migrations/0001_init.sql` を適用した空のインメモリ DB を返す。 */
+/** `migrations/` の SQL を番号順にすべて適用した空のインメモリ DB を返す。 */
 export function createTestD1(): TestD1Database {
 	const db = new DatabaseSync(":memory:");
-	db.exec(readFileSync(MIGRATION_PATH, "utf8"));
+	for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort()) {
+		db.exec(readFileSync(MIGRATIONS_DIR + file, "utf8"));
+	}
 	return new TestD1(db) as unknown as TestD1Database;
 }

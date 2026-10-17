@@ -27,11 +27,13 @@
 - 秘密値をコード・ドキュメント・Git に書かない。環境変数名だけを書く
 - `src/auth/` は personal-rag-mcp からの流用。表示名・説明文以外は変更しない
 - 指示文は 3 か所にある（`src/instructions.ts` の `SERVER_INSTRUCTIONS`、README.md、SETUP.md 手順 8）。片方だけ直さず同時に直す。`SERVER_INSTRUCTIONS` は 8 行以内・空行なし。README.md と SETUP.md のブロックは一字一句同じ（`src/instructions.test.ts` が両方を固定している）
+- 指示文と `check_board` は claude.ai のチャットのためのもの。チャット以外と分かったクライアント（`x-anthropic-client` が `NON_CHAT_CLIENTS` に入るもの）には initialize で指示文を返さず、`check_board` もボードに触らせない（`src/index.ts` と `src/service/reminders.ts`）。分からないクライアントはチャット扱いにする
+- Windows で作業するときも改行は LF（`.gitattributes`）。CRLF で取り出すと `src/instructions.test.ts` の正規表現が README のブロックを読めない
 - 仕様（SQL の要旨・ツールの入出力・上限）を実装で変えたら、`docs/plans/<phase>.md` の本文も同じコミットで直す。プランは完了チェックだけ付けて放置しない
 
 ## テスト
 
-- D1 は `createTestD1()`（`src/test-utils/sqlite-d1.ts`。`node:sqlite` に `migrations/0001_init.sql` を適用する）で代替する。開いた DB は `afterEach` で `close()` する
+- D1 は `createTestD1()`（`src/test-utils/sqlite-d1.ts`。`node:sqlite` に `migrations/` の SQL を番号順に全部適用する）で代替する。開いた DB は `afterEach` で `close()` する
 - `src/test-utils/` は `src/index.ts` から到達させない（Worker のバンドルに入れない）
 - node 環境の vitest では `agents/mcp` / `@cloudflare/workers-oauth-provider` / `src/auth/` が `cloudflare:` スキームの import を辿れず読めない。`src/index.ts` のテストは `vi.mock` で最小モックを挟む（`src/index.test.ts` が実例）
 - 時計は `ReminderService` の `clock` に注入してテストする。`Date.now` を直接呼ぶテストを書かない

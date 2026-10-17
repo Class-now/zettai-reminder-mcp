@@ -44,6 +44,15 @@ export interface BoardCheckRecord {
 	ok: boolean;
 	errorCode?: string | null;
 	durationMs: number;
+	caller?: CallerInfo;
+}
+
+/** check_board の呼び出し元。分からない項目は null。 */
+export interface CallerInfo {
+	/** `x-anthropic-client` ヘッダー（Claude Code なら `ClaudeCode`） */
+	client: string | null;
+	userAgent: string | null;
+	sessionId: string | null;
 }
 
 interface ReminderRow {
@@ -118,8 +127,8 @@ export class ReminderRepo {
 	async recordCheck(record: BoardCheckRecord): Promise<void> {
 		await this.db
 			.prepare(
-				`INSERT INTO board_checks (checked_at, returned_count, ok, error_code, duration_ms)
-				 VALUES (?, ?, ?, ?, ?)`,
+				`INSERT INTO board_checks (checked_at, returned_count, ok, error_code, duration_ms, client, user_agent, session_id)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
 			.bind(
 				record.checkedAt,
@@ -127,6 +136,9 @@ export class ReminderRepo {
 				record.ok ? 1 : 0,
 				record.errorCode ?? null,
 				record.durationMs,
+				record.caller?.client ?? null,
+				record.caller?.userAgent ?? null,
+				record.caller?.sessionId ?? null,
 			)
 			.run();
 	}

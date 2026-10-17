@@ -26,8 +26,22 @@ vi.mock("agents/mcp", () => ({
 	},
 }));
 
+type InitHandler = (request: unknown, extra: unknown) => Promise<Record<string, unknown>>;
+
 vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
 	McpServer: class McpServer {
+		server = {
+			handlers: new Map<string, InitHandler>(),
+			setRequestHandler(schema: { shape: { method: { value: string } } }, handler: InitHandler) {
+				this.handlers.set(schema.shape.method.value, handler);
+			},
+			_oninitialize: async () => ({
+				protocolVersion: "2025-11-25",
+				serverInfo: { name: "絶対伝えろよリマインダー", version: "0.1.0" },
+				capabilities: {},
+				instructions: "指示文",
+			}),
+		};
 		constructor(
 			public info: unknown,
 			public options: unknown,
@@ -41,7 +55,8 @@ vi.mock("./auth/github-handler", () => ({ GitHubHandler: githubHandler }));
 const registerReminderTools =
 	vi.fn<(server: unknown, deps: { repo: unknown; clock?: () => number }) => void>();
 
-vi.mock("./tools/register", () => ({
+vi.mock("./tools/register", async (importActual) => ({
+	callerOf: (await importActual<typeof import("./tools/register")>()).callerOf,
 	registerReminderTools: (server: unknown, deps: { repo: unknown; clock?: () => number }) =>
 		registerReminderTools(server, deps),
 }));
@@ -97,7 +112,7 @@ describe("worker entry", () => {
 });
 
 type ReminderMCPInstance = {
-	server: { info: unknown; options: unknown };
+	server: { info: unknown; options: unknown; server: { handlers: Map<string, InitHandler> } };
 	env: { DB: unknown };
 	init(): Promise<void>;
 };
@@ -132,5 +147,21 @@ describe("ReminderMCP", () => {
 		expect(server).toBe(instance.server);
 		expect(deps.repo).toBeInstanceOf(ReminderRepo);
 		expect(deps.clock).toBe(Date.now);
+	});
+
+	it("initialize の指示文は claude.ai のチャットにだけ返し、Claude Code には返さない", async () => {
+		const instance = newAgent();
+		await instance.init();
+		const initialize = instance.server.server.handlers.get("initialize");
+		expect(initialize).toBeDefined();
+		const extraOf = (client?: string) => ({
+			requestInfo: { headers: client ? { "x-anthropic-client": client } : {} },
+		});
+
+		const chat = await initialize?.({}, extraOf());
+		expect(chat?.instructions).toBe("指示文");
+		const code = await initialize?.({}, extraOf("ClaudeCode"));
+		expect(code).not.toHaveProperty("instructions");
+		expect(code?.serverInfo).toEqual({ name: "絶対伝えろよリマインダー", version: "0.1.0" });
 	});
 });

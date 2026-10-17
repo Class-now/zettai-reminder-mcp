@@ -10,7 +10,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { DateTimeError } from "../lib/datetime";
-import type { ReminderRepo } from "../repo/reminders";
+import type { CallerInfo, ReminderRepo } from "../repo/reminders";
 import {
 	type AddReminderInput,
 	type ErrorCode,
@@ -30,6 +30,25 @@ export interface ToolResult {
 export interface ReminderToolDeps {
 	repo: ReminderRepo;
 	clock?: () => number;
+}
+
+/** リクエストの付帯情報のうち、呼び出し元の判定に使う部分（MCP SDK の RequestHandlerExtra の一部）。 */
+export interface RequestExtra {
+	sessionId?: string;
+	requestInfo?: { headers?: Record<string, string | string[] | undefined> };
+}
+
+function header(extra: RequestExtra, name: string): string | null {
+	const value = extra.requestInfo?.headers?.[name];
+	return (Array.isArray(value) ? value.join(", ") : value) ?? null;
+}
+
+export function callerOf(extra: RequestExtra): CallerInfo {
+	return {
+		client: header(extra, "x-anthropic-client"),
+		userAgent: header(extra, "user-agent"),
+		sessionId: extra.sessionId ?? header(extra, "mcp-session-id"),
+	};
 }
 
 function ok(result: unknown): ToolResult {
@@ -60,7 +79,7 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
 }
 
 const CHECK_BOARD_DESCRIPTION =
-	"新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。表示時刻を過ぎたリマインダーを 1 回 50 件まで返し、同時にアーカイブする（同じものは二度返らない。超えた分は残り、次の呼び出しで返る）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。has_more が true なら最後に「まだ表示していないリマインダーがあります」と 1 行書く。";
+	"新しい会話（履歴にあなたの過去の応答が 1 つも無い会話）の最初の応答を書く前に 1 回だけ呼ぶ。日を空けて再開した会話や、会話の途中でツールを読み込み直したときは呼ばない。表示時刻を過ぎたリマインダーを 1 回 50 件まで返し、同時にアーカイブする（同じものは二度返らない。超えた分は残り、次の呼び出しで返る）。返された line を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。has_more が true なら最後に「まだ表示していないリマインダーがあります」と 1 行書く。";
 
 const ADD_REMINDER_DESCRIPTION =
 	"リマインダーを登録する。頼まれたときは kind=\"explicit\"、会話から拾って自動登録するときは kind=\"auto\"。show_at を省略すると即時（次の check_board）で表示される。返り値の confirmation を同じ応答に 1 行そのまま書く。";
@@ -119,7 +138,8 @@ const deleteShape = {
 export function createReminderHandlers(deps: ReminderToolDeps) {
 	const service = new ReminderService(deps.repo, deps.clock);
 	return {
-		check_board: (): Promise<ToolResult> => run(() => service.checkBoard()),
+		check_board: (caller?: CallerInfo): Promise<ToolResult> =>
+			run(() => service.checkBoard(caller)),
 		add_reminder: (input: AddReminderInput): Promise<ToolResult> =>
 			run(() => service.addReminder(input)),
 		list_reminders: (input: ListRemindersInput): Promise<ToolResult> =>
@@ -134,8 +154,8 @@ export function createReminderHandlers(deps: ReminderToolDeps) {
 export function registerReminderTools(server: McpServer, deps: ReminderToolDeps): void {
 	const handlers = createReminderHandlers(deps);
 
-	server.registerTool("check_board", { description: CHECK_BOARD_DESCRIPTION }, () =>
-		handlers.check_board(),
+	server.registerTool("check_board", { description: CHECK_BOARD_DESCRIPTION }, (extra) =>
+		handlers.check_board(callerOf(extra)),
 	);
 
 	server.registerTool(

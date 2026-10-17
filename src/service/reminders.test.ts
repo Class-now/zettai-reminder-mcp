@@ -54,6 +54,20 @@ async function latestCheck(): Promise<{
 }
 
 describe("checkBoard", () => {
+	it("Claude Code からの呼び出しはボードに触らず、呼び出し元を記録する", async () => {
+		await service.addReminder({ body: "伝えるもの", kind: "explicit" });
+		const caller = { client: "ClaudeCode", userAgent: "Claude-User", sessionId: "s1" };
+
+		expect(await service.checkBoard(caller)).toEqual({ count: 0, skipped: true, items: [] });
+		const row = await db
+			.prepare("SELECT returned_count, client, user_agent, session_id FROM board_checks")
+			.first();
+		expect(row).toEqual({ returned_count: 0, client: "ClaudeCode", user_agent: "Claude-User", session_id: "s1" });
+
+		const chat = await service.checkBoard({ client: null, userAgent: "Claude-User", sessionId: "s2" });
+		expect(chat.items.map((item) => item.body)).toEqual(["伝えるもの"]);
+	});
+
 	it("期限の近い順・期限なしは後ろに並べて返す", async () => {
 		await service.addReminder({ body: "10/5 期限", kind: "explicit", due_at: "2026-10-05" });
 		await service.addReminder({ body: "10/3 期限", kind: "explicit", due_at: "2026-10-03" });
