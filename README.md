@@ -7,8 +7,8 @@
 > - このリポジトリは公開用の写し（コミット作者を GitHub の noreply アドレスにそろえた）。運用中の Worker の設定値（D1/KV の id）が `wrangler.jsonc` に入っているが、Cloudflare にログインしないと使えない識別子で秘密値ではない。秘密値は `wrangler secret` にあり、リポジトリには変数名しかない。
 >
 > ### リンク
-> - ProtoPedia: （登録後に追記）
-> - 紹介動画: （登録後に追記）
+> - ProtoPedia: https://protopedia.net/prototype/10110
+> - 紹介動画: https://youtu.be/tSDea2tXf3I
 
 claude.ai のカスタムコネクタとして接続する個人用のリモート MCP サーバー。新しい会話の最初の応答を書く前に Claude が `check_board` を呼ぶと、表示時刻を過ぎた未アーカイブのリマインダーを返し、同時にアーカイブする（同じものは二度返らない）。
 
