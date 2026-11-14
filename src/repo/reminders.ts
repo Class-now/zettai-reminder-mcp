@@ -240,6 +240,23 @@ export class ReminderRepo {
 		return results.length === 0 ? null : toReminder(results[0]);
 	}
 
+	/**
+	 * 取得済み（アーカイブ済み・未削除）の行を、指定の表示時刻で待機中に戻す。
+	 * `showAt` が `now` より前なら `now` にする（次の `takeBoard` で即時に返る）。
+	 * 対象が無ければ（存在しない・未取得・削除済み）`null`。
+	 */
+	async snooze(id: string, showAt: string, now: string): Promise<Reminder | null> {
+		const { results } = await this.db
+			.prepare(
+				`UPDATE reminders SET archived_at = NULL, show_at = ?1, updated_at = ?2
+				 WHERE id = ?3 AND archived_at IS NOT NULL AND deleted_at IS NULL
+				 RETURNING id, body, show_at, due_at, note, kind, created_at, updated_at, archived_at`,
+			)
+			.bind(showAt < now ? now : showAt, now, id)
+			.all<ReminderRow>();
+		return results.length === 0 ? null : toReminder(results[0]);
+	}
+
 	/** 論理削除。`updated_at` も進める。対象が無ければ `false`。 */
 	async softDelete(id: string, now: string): Promise<boolean> {
 		const { results } = await this.db

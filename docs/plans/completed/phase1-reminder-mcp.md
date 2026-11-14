@@ -241,7 +241,8 @@ Do NOT implement: MCP ツール（Task 4）、物理削除・保持期間の処�
 4. `update_reminder` — 入力: `id`（必須）と、`body`（1〜200 文字、`add_reminder` と同じ正規化。`null` は指定なしと同じ）/ `show_at`（`null` は指定なしと同じ。消せない列なので消去の意味は持たない）/ `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上
    - アーカイブ済み・削除済み・存在しない id は `NOT_FOUND`。更新項目が 1 つも無ければ `VALIDATION_ERROR`
    - 返り値: `{ reminder: {...}, confirmation: "更新しました：[本文]（表示 M/D HH:MM[、期限 M/D]）" }`
-5. `delete_reminder` — 入力: `id`（必須）。アクティブな行だけを論理削除。無ければ `NOT_FOUND`。返り値 `{ deleted: id }`
+5. `snooze_reminder`（フェーズ 1 の後に追加）— 入力: `id`・`show_at`（必須）。取得済み（`archived_at IS NOT NULL AND deleted_at IS NULL`）の行を `UPDATE … SET archived_at = NULL, show_at = max(show_at, now) … RETURNING` の 1 文で待機中に戻す。新しい行は作らない。無ければ `NOT_FOUND`。返り値 `{ reminder, confirmation }`（「もう一度出します：…」）
+6. `delete_reminder` — 入力: `id`（必須）。アクティブな行だけを論理削除。無ければ `NOT_FOUND`。返り値 `{ deleted: id }`
 
 各ツールの `description`（日本語）には、いつ呼ぶか・何を返すかを 1〜3 文で書く。特に `check_board` は「新しい会話の最初の応答を書く前に 1 回だけ呼ぶ。返された `line` を応答の 1 行目から順にそのまま書く。0 件なら何も書かない。」と書く。
 
