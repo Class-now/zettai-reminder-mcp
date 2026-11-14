@@ -36,6 +36,7 @@ Claude に計算や整形をさせない。並び順・残り日数・表示用�
 | `add_reminder` | `body`（必須、1〜200 文字。連続する空白と改行は半角スペース 1 個に畳む）、`kind`（`explicit` / `auto`、必須）、`show_at`（任意、省略または過去の時刻＝即時）、`due_at`（任意、日時または `YYYY-MM-DD`＝その日の 23:59）、`note`（任意、1000 文字以内） | `{ reminder, confirmation }`。`reminder` は `{ id, body, show_at, due_at, note, kind, created_at }`。`confirmation` は `登録しました：[本文]（表示 M/D HH:MM[、期限 M/D]）` |
 | `list_reminders` | `status`（`waiting` / `active` / `archived`、必須）、`limit`（1〜100。既定は archived が 20、waiting / active が 100） | `{ status, count, items }`。`items` は `add_reminder` の `reminder` に `archived_at` が付いた形（`line` と `days_left` は付かない）。`limit` で切り捨てた分があるときだけ `has_more: true` が付く。どの行の状態も変えない |
 | `update_reminder` | `id`（必須）と `body`（1〜200 文字）/ `show_at`（過去に動かすと即時になる）/ `due_at`（`null` で期限を消す）/ `note`（`null` で消す）のうち 1 つ以上 | `{ reminder, confirmation }`。`confirmation` は `更新しました：…` で同じ形。取得済み・削除済み・存在しない id は `NOT_FOUND` |
+| `snooze_reminder` | `id`・`show_at`（必須） | `{ reminder, confirmation }`。取得済みの行を指定の表示時刻で待機中に戻す（過去は今に置き換え）。未取得・削除済み・存在しない id は `NOT_FOUND` |
 | `delete_reminder` | `id`（必須） | `{ deleted: id }`。論理削除。対象が無ければ `NOT_FOUND` |
 
 `check_board` の `line` は次の 4 形。サーバーが完成させるので Claude は整形しない。

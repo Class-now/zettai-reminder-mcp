@@ -17,6 +17,7 @@ import {
 	type ListRemindersInput,
 	ReminderService,
 	ServiceError,
+	type SnoozeReminderInput,
 	type UpdateReminderInput,
 } from "../service/reminders";
 
@@ -93,6 +94,9 @@ const UPDATE_REMINDER_DESCRIPTION =
 const DELETE_REMINDER_DESCRIPTION =
 	"リマインダーを取り消す（論理削除）。取得済み・削除済み・存在しない id は NOT_FOUND になる。";
 
+const SNOOZE_REMINDER_DESCRIPTION =
+	"check_board で一度出したリマインダーを、指定の表示時刻にもう一度出す（「あとでまた言って」と頼まれたとき）。新しく登録し直さない。未取得・削除済み・存在しない id は NOT_FOUND になる。返り値の confirmation を同じ応答に 1 行そのまま書く。";
+
 const JST_HINT = "日本時間の YYYY-MM-DDTHH:MM:SS+09:00 形式";
 
 // 任意の入力はすべて `null` を省略と同じに受ける（`nullish()` / `nullable()`）。
@@ -130,6 +134,11 @@ const updateShape = {
 	note: z.string().nullable().optional().describe("新しい会話メモ（1000 文字以内）。null で消す"),
 };
 
+const snoozeShape = {
+	id: z.string().describe("もう一度出す取得済みのリマインダー id"),
+	show_at: z.string().describe(`もう一度出す表示時刻（${JST_HINT}）`),
+};
+
 const deleteShape = {
 	id: z.string().describe("取り消すリマインダーの id"),
 };
@@ -146,6 +155,8 @@ export function createReminderHandlers(deps: ReminderToolDeps) {
 			run(() => service.listReminders(input)),
 		update_reminder: (input: UpdateReminderInput): Promise<ToolResult> =>
 			run(() => service.updateReminder(input)),
+		snooze_reminder: (input: SnoozeReminderInput): Promise<ToolResult> =>
+			run(() => service.snoozeReminder(input)),
 		delete_reminder: (input: { id: string }): Promise<ToolResult> =>
 			run(() => service.deleteReminder(input.id)),
 	};
@@ -174,6 +185,12 @@ export function registerReminderTools(server: McpServer, deps: ReminderToolDeps)
 		"update_reminder",
 		{ description: UPDATE_REMINDER_DESCRIPTION, inputSchema: updateShape },
 		(input) => handlers.update_reminder(input as UpdateReminderInput),
+	);
+
+	server.registerTool(
+		"snooze_reminder",
+		{ description: SNOOZE_REMINDER_DESCRIPTION, inputSchema: snoozeShape },
+		(input) => handlers.snooze_reminder(input as SnoozeReminderInput),
 	);
 
 	server.registerTool(
