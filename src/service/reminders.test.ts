@@ -643,3 +643,63 @@ describe("deleteReminder", () => {
 		await expect(service.deleteReminder("missing")).rejects.toMatchObject({ code: "NOT_FOUND" });
 	});
 });
+
+describe("snoozeReminder", () => {
+	it("取得済みを指定の時刻に待機中へ戻し、その時刻に check_board でもう一度出る", async () => {
+		const added = await service.addReminder({ body: "書類を出す", kind: "explicit" });
+		expect((await service.checkBoard()).count).toBe(1);
+
+		const snoozed = await service.snoozeReminder({
+			id: added.reminder.id,
+			show_at: "2026-10-03T20:00+09:00",
+		});
+		expect(snoozed.reminder.show_at).toBe("2026-10-03T20:00:00+09:00");
+		expect(snoozed.confirmation).toBe("もう一度出します：書類を出す（表示 10/3 20:00）");
+		expect((await service.listReminders({ status: "waiting" })).count).toBe(1);
+		expect((await service.listReminders({ status: "archived" })).count).toBe(0);
+
+		expect((await service.checkBoard()).count).toBe(0);
+		nowMs += 12 * 60 * 60 * 1000;
+		const board = await service.checkBoard();
+		expect(board.items.map((item) => item.id)).toEqual([added.reminder.id]);
+	});
+
+	it("過去の時刻は今に置き換え、次の check_board ですぐ出る", async () => {
+		const added = await service.addReminder({ body: "すぐ出す", kind: "explicit" });
+		await service.checkBoard();
+		const snoozed = await service.snoozeReminder({
+			id: added.reminder.id,
+			show_at: "2026-10-01T09:00+09:00",
+		});
+		expect(snoozed.reminder.show_at).toBe(NOW);
+		expect((await service.checkBoard()).count).toBe(1);
+	});
+
+	it("未取得・削除済み・存在しない id は NOT_FOUND、行は増えない", async () => {
+		const active = await service.addReminder({ body: "未取得", kind: "explicit", show_at: "2026-10-05T09:00+09:00" });
+		const gone = await service.addReminder({ body: "削除済み", kind: "explicit" });
+		await service.checkBoard();
+		await expect(
+			service.snoozeReminder({ id: active.reminder.id, show_at: "2026-10-06T09:00+09:00" }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+		const row = await db
+			.prepare("UPDATE reminders SET deleted_at = ? WHERE id = ? RETURNING id")
+			.bind(NOW, gone.reminder.id)
+			.first();
+		expect(row).not.toBeNull();
+		await expect(
+			service.snoozeReminder({ id: gone.reminder.id, show_at: "2026-10-06T09:00+09:00" }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+		await expect(
+			service.snoozeReminder({ id: "missing", show_at: "2026-10-06T09:00+09:00" }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+		const count = await db.prepare("SELECT COUNT(*) AS c FROM reminders").first<{ c: number }>();
+		expect(Number(count?.c)).toBe(2);
+	});
+
+	it("形式違いの時刻は INVALID_DATETIME", async () => {
+		await expect(
+			service.snoozeReminder({ id: "x", show_at: "2026-10-06 09:00" }),
+		).rejects.toMatchObject({ code: "INVALID_DATETIME" });
+	});
+});

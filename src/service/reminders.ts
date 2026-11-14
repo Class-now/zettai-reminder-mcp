@@ -132,6 +132,16 @@ export interface ListRemindersResult {
 	items: ListReminderPayload[];
 }
 
+export interface SnoozeReminderInput {
+	id: string;
+	show_at: string;
+}
+
+export interface SnoozeReminderResult {
+	reminder: ReminderPayload;
+	confirmation: string;
+}
+
 export interface DeleteReminderResult {
 	deleted: string;
 }
@@ -437,6 +447,23 @@ export class ReminderService {
 		return {
 			reminder: reminderPayload(reminder),
 			confirmation: confirmationLine("更新しました", reminder),
+		};
+	}
+
+	/**
+	 * 取得済みのリマインダーを、指定の表示時刻にもう一度出す（スヌーズ）。
+	 * 「あとでまた言って」に応えるためのもので、新しい行は作らない（重複を作らない）。
+	 */
+	async snoozeReminder(input: SnoozeReminderInput): Promise<SnoozeReminderResult> {
+		const showAt = parseJstDateTime(input.show_at);
+		const now = nowJst(this.clock());
+		const reminder = await this.repo.snooze(input.id, showAt, now);
+		if (reminder === null) {
+			throw new ServiceError("NOT_FOUND", `取得済みのリマインダーがありません: ${input.id}`);
+		}
+		return {
+			reminder: reminderPayload(reminder),
+			confirmation: confirmationLine("もう一度出します", reminder),
 		};
 	}
 

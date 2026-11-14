@@ -51,6 +51,7 @@ describe("registerReminderTools", () => {
 			"add_reminder",
 			"list_reminders",
 			"update_reminder",
+			"snooze_reminder",
 			"delete_reminder",
 		]);
 		for (const call of registerTool.mock.calls) {
