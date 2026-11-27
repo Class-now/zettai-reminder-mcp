@@ -1,0 +1,8 @@
+# 比較実験用（PR #1 の指摘が CLAUDE.md の Code Guidelines 経由か Learnings 経由かを確かめる）。main には入れない。
+reviews:
+  auto_review:
+    enabled: true
+    drafts: true
+knowledge_base:
+  code_guidelines:
+    enabled: false
